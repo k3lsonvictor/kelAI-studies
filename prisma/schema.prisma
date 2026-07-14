@@ -1,0 +1,54 @@
+datasource db {
+  provider = "postgresql"
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model Contact {
+  id            String         @id @default(uuid())
+  phone         String         @unique
+  name          String?
+  createdAt     DateTime       @default(now()) @map("created_at")
+  updatedAt     DateTime       @updatedAt @map("updated_at")
+  conversations Conversation[]
+
+  @@map("contacts")
+}
+
+enum ConversationStatus {
+  OPEN
+  CLOSED
+}
+
+model Conversation {
+  id        String             @id @default(uuid())
+  contactId String             @map("contact_id")
+  status    ConversationStatus @default(OPEN)
+  createdAt DateTime           @default(now()) @map("created_at")
+  updatedAt DateTime           @updatedAt @map("updated_at")
+  contact   Contact            @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  messages  Message[]
+
+  @@map("conversations")
+}
+
+enum MessageDirection {
+  INCOMING
+  OUTGOING
+}
+
+model Message {
+  id             String           @id @default(uuid())
+  conversationId String           @map("conversation_id")
+  direction      MessageDirection
+  type           String           @default("text")
+  body           String
+  status         String?          // sent, delivered, read, failed
+  externalId     String?          @unique @map("external_id") // wamid do WhatsApp
+  createdAt      DateTime         @default(now()) @map("created_at")
+  conversation   Conversation     @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  @@map("messages")
+}

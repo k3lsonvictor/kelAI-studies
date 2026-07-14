@@ -1,0 +1,32 @@
+# Dependências
+node_modules/
+.pnpm-store/
+
+# Sensível (Variáveis de Ambiente e Segredos)
+.env
+.env*.local
+
+# Compilação e Distribuição
+dist/
+build/
+out/
+*.tsbuildinfo
+
+# Logs e Dados de Execução
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+.system_generated/
+
+# Sistema Operacional e Editores
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
