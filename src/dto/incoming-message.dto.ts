@@ -6,6 +6,8 @@ export interface IncomingMessageDTO {
   type: "text" | "image" | "document" | "audio" | "video" | "other";
   body: string;
   phoneNumberId: string;
+  mediaId?: string | undefined;
+  caption?: string | undefined;
 }
 
 /**
@@ -30,21 +32,28 @@ export function parseIncomingMessage(payload: any): IncomingMessageDTO[] {
 
     let type: IncomingMessageDTO["type"] = "other";
     let body = "";
+    let mediaId: string | undefined = undefined;
+    let caption: string | undefined = undefined;
 
     if (msg.type === "text") {
       type = "text";
       body = msg.text?.body || "";
     } else if (msg.type === "image") {
       type = "image";
-      body = "[Imagem]";
+      mediaId = msg.image?.id;
+      caption = msg.image?.caption;
+      body = caption || "[Imagem]";
     } else if (msg.type === "document") {
       type = "document";
+      mediaId = msg.document?.id;
       body = "[Documento]";
     } else if (msg.type === "audio") {
       type = "audio";
+      mediaId = msg.audio?.id;
       body = "[Áudio]";
     } else if (msg.type === "video") {
       type = "video";
+      mediaId = msg.video?.id;
       body = "[Vídeo]";
     }
 
@@ -56,6 +65,8 @@ export function parseIncomingMessage(payload: any): IncomingMessageDTO[] {
       type,
       body,
       phoneNumberId,
+      mediaId,
+      caption,
     });
   }
 

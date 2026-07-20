@@ -20,5 +20,6 @@ export const env = {
   phoneNumberId: requiredEnvVars.PHONE_NUMBER_ID,
   openaiApiKey: requiredEnvVars.OPENAI_API_KEY,
   openaiModel: process.env.OPENAI_MODEL || "gpt-4o-mini",
+  geradorPostsApiUrl: process.env.GERADOR_POSTS_API_URL || "http://localhost:3000",
   port: Number(process.env.PORT) || 3333,
 } as const;

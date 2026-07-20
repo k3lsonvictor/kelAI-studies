@@ -3,6 +3,7 @@ import type { ConversationService } from "./conversation.service.js";
 import type { MessageRepository } from "../repositories/message.repository.js";
 import type { WhatsAppService } from "./whatsapp.service.js";
 import type { AIService } from "./ai.service.js";
+import type { PostFlowService } from "./post-flow.service.js";
 import type { IncomingMessageDTO } from "../dto/incoming-message.dto.js";
 
 export class MessageService {
@@ -11,7 +12,8 @@ export class MessageService {
     private readonly conversationService: ConversationService,
     private readonly messageRepository: MessageRepository,
     private readonly whatsappService: WhatsAppService,
-    private readonly aiService: AIService
+    private readonly aiService: AIService,
+    private readonly postFlowService?: PostFlowService
   ) {}
 
   /**
@@ -19,11 +21,12 @@ export class MessageService {
    * 1. Localiza ou cria o contato
    * 2. Localiza ou cria uma conversa ativa
    * 3. Salva a mensagem de entrada recebida
-   * 4. Busca o histórico de mensagens recente da conversa (incluindo a mensagem que acabou de chegar)
-   * 5. Envia o contexto conversacional para a OpenAI gerar a resposta
-   * 6. Trata falhas de API de IA entregando mensagem amigável de fallback
-   * 7. Envia a resposta via WhatsApp Cloud API
-   * 8. Salva a resposta enviada no banco de dados
+   * 4. Verifica se faz parte do fluxo de geração de post em etapas
+   * 5. Busca o histórico de mensagens recente da conversa (se não for fluxo de post)
+   * 6. Envia o contexto conversacional para a OpenAI gerar a resposta
+   * 7. Trata falhas de API de IA entregando mensagem amigável de fallback
+   * 8. Envia a resposta via WhatsApp Cloud API
+   * 9. Salva a resposta enviada no banco de dados
    */
   async handleIncomingMessage(incomingDto: IncomingMessageDTO): Promise<void> {
     console.log(`[MessageService] Mensagem recebida de ${incomingDto.senderPhone} | Conteúdo: "${incomingDto.body}"`);
@@ -50,7 +53,20 @@ export class MessageService {
     });
     console.log(`[MessageService] Mensagem de entrada salva no banco. ID: ${savedIncoming.id}`);
 
-    // 4. Buscar histórico de conversação recente (últimas 10 mensagens para contexto de conversa)
+    // 4. Verificar se a mensagem pertence ou inicia o fluxo interativo de criação de posts
+    if (this.postFlowService) {
+      const handledByPostFlow = await this.postFlowService.handlePostFlow(
+        contact.id,
+        incomingDto
+      );
+
+      if (handledByPostFlow) {
+        console.log(`[MessageService] Mensagem processada pelo fluxo interativo de posts.`);
+        return;
+      }
+    }
+
+    // 5. Buscar histórico de conversação recente (últimas 10 mensagens para contexto de conversa)
     console.log(`[MessageService] Buscando histórico conversacional para a conversa ${conversation.id}`);
     const history = await this.conversationService.getHistory(conversation.id, 10);
 

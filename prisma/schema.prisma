@@ -13,6 +13,7 @@ model Contact {
   createdAt     DateTime       @default(now()) @map("created_at")
   updatedAt     DateTime       @updatedAt @map("updated_at")
   conversations Conversation[]
+  postSession   PostSession?
 
   @@map("contacts")
 }
@@ -52,3 +53,29 @@ model Message {
 
   @@map("messages")
 }
+
+enum PostStep {
+  SELECT_BUSINESS_TYPE
+  SELECT_TEMPLATE
+  INPUT_TITLE
+  INPUT_PRICE
+  INPUT_IMAGE
+  GENERATING
+}
+
+model PostSession {
+  id            String   @id @default(uuid())
+  contactId     String   @unique @map("contact_id")
+  step          PostStep
+  businessType  String?  @map("business_type")
+  templateId    String?  @map("template_id")
+  productTitle  String?  @map("product_title")
+  productPrice  String?  @map("product_price")
+  productImage  String?  @map("product_image")
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+  contact       Contact  @relation(fields: [contactId], references: [id], onDelete: Cascade)
+
+  @@map("post_sessions")
+}
+

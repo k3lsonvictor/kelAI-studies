@@ -14,16 +14,36 @@ export class MessageRepository {
     type?: string | null;
     status?: string | null;
   }): Promise<Message> {
-    return prisma.message.create({
-      data: {
-        conversationId: data.conversationId,
-        direction: data.direction === "INCOMING" ? MessageDirection.INCOMING : MessageDirection.OUTGOING,
-        body: data.body,
-        type: data.type || "text",
-        status: data.status ?? null,
-        externalId: data.externalId ?? null,
-      },
-    });
+    if (data.externalId) {
+      const existing = await prisma.message.findUnique({
+        where: { externalId: data.externalId },
+      });
+      if (existing) {
+        console.log(`[MessageRepository] Mensagem com externalId ${data.externalId} já existe no banco. Retornando registro existente.`);
+        return existing;
+      }
+    }
+
+    try {
+      return await prisma.message.create({
+        data: {
+          conversationId: data.conversationId,
+          direction: data.direction === "INCOMING" ? MessageDirection.INCOMING : MessageDirection.OUTGOING,
+          body: data.body,
+          type: data.type || "text",
+          status: data.status ?? null,
+          externalId: data.externalId ?? null,
+        },
+      });
+    } catch (error: any) {
+      if (error.code === "P2002" && data.externalId) {
+        const existing = await prisma.message.findUnique({
+          where: { externalId: data.externalId },
+        });
+        if (existing) return existing;
+      }
+      throw error;
+    }
   }
 
   /**

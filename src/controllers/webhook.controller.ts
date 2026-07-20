@@ -3,11 +3,14 @@ import { env } from "../config/env.js";
 import { ContactRepository } from "../repositories/contact.repository.js";
 import { ConversationRepository } from "../repositories/conversation.repository.js";
 import { MessageRepository } from "../repositories/message.repository.js";
+import { PostSessionRepository } from "../repositories/post-session.repository.js";
 import { ContactService } from "../services/contact.service.js";
 import { ConversationService } from "../services/conversation.service.js";
 import { WhatsAppService } from "../services/whatsapp.service.js";
 import { AIService } from "../services/ai.service.js";
 import { MessageService } from "../services/message.service.js";
+import { PostGeneratorService } from "../services/post-generator.service.js";
+import { PostFlowService } from "../services/post-flow.service.js";
 import { OpenAIProvider } from "../integrations/openai/openai.client.js";
 import { parseIncomingMessage } from "../dto/incoming-message.dto.js";
 import type { WhatsAppWebhookPayload } from "../types/whatsapp.types.js";
@@ -20,15 +23,23 @@ export class WebhookController {
     const contactRepository = new ContactRepository();
     const conversationRepository = new ConversationRepository();
     const messageRepository = new MessageRepository();
+    const postSessionRepository = new PostSessionRepository();
 
     // 2. Inicialização dos Services de domínio
     const contactService = new ContactService(contactRepository);
     const conversationService = new ConversationService(conversationRepository, messageRepository);
     const whatsappService = new WhatsAppService();
 
-    // 3. Inicialização da Integração de IA de forma desacoplada (implementa AIProvider)
+    // 3. Inicialização da Integração de IA e Gerador de Posts
     const openAIProvider = new OpenAIProvider();
     const aiService = new AIService(openAIProvider);
+
+    const postGeneratorService = new PostGeneratorService();
+    const postFlowService = new PostFlowService(
+      postSessionRepository,
+      whatsappService,
+      postGeneratorService
+    );
 
     // 4. Injeção no orquestrador MessageService
     this.messageService = new MessageService(
@@ -36,7 +47,8 @@ export class WebhookController {
       conversationService,
       messageRepository,
       whatsappService,
-      aiService
+      aiService,
+      postFlowService
     );
   }
 
