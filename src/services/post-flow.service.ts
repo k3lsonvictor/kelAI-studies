@@ -163,7 +163,17 @@ export class PostFlowService {
 
     // --- COMANDO DE CANCELAMENTO OU ENCERRAMENTO ---
     if (session && this.isCancellationCommand(cleanText)) {
-      await this.postSessionRepository.deleteByContactId(contactId);
+      // Em vez de deletar para não perder o nicho salvo, apenas reiniciamos a sessão preservando o nicho
+      await this.postSessionRepository.createOrUpdate(contactId, {
+        step: PostStep.SELECT_FLOW_MODE,
+        postType: null,
+        templateId: null,
+        colors: null,
+        productTitle: null,
+        productPrice: null,
+        productImage: null,
+      });
+
       await this.whatsappService.sendText(
         senderPhone,
         "❌ *Fluxo de criação de post encerrado.*\n\nQuando quiser criar um novo post, basta digitar *'novo post'* ou me enviar a foto do produto!",
@@ -172,7 +182,7 @@ export class PostFlowService {
       return true;
     }
 
-    // --- COMANDO DE ALTERAR NICHO (Reinicia no Nicho) ---
+    // --- COMANDO DE ALTERAR NICHO (Limpa o nicho salvo e reinicia) ---
     if (this.isNichoChangeCommand(cleanText)) {
       session = await this.postSessionRepository.createOrUpdate(contactId, {
         step: PostStep.SELECT_BUSINESS_TYPE,
@@ -195,31 +205,50 @@ export class PostFlowService {
       return true;
     }
 
-    // --- GATILHO INICIAL: "novo post" ➔ IA pergunta o Nicho ---
+    // --- GATILHO INICIAL: "novo post" ➔ Só pergunta o Nicho se NÃO estiver salvo ---
     if (!session || isTrigger) {
       if (!session && !isTrigger) {
         return false;
       }
 
-      session = await this.postSessionRepository.createOrUpdate(contactId, {
-        step: PostStep.SELECT_BUSINESS_TYPE,
-        businessType: null,
-        hasHumanModel: null,
-        modelProfile: null,
-        postType: null,
-        templateId: null,
-        colors: null,
-        productTitle: null,
-        productPrice: null,
-        productImage: null,
-      });
+      const hasSavedNicho = session && session.businessType;
 
-      await this.sendBusinessTypePrompt(
-        senderPhone,
-        "Olá! 🚀 Bem-vindo ao Gerador de Posts kel-IA!\n\nQual é o segmento/nicho do seu negócio?",
-        cwCtx
-      );
-      return true;
+      if (hasSavedNicho) {
+        // Nicho já está salvo, pula direto para a escolha do Modo (Rápido vs Personalizado)
+        session = await this.postSessionRepository.createOrUpdate(contactId, {
+          step: PostStep.SELECT_FLOW_MODE,
+          postType: null,
+          templateId: null,
+          colors: null,
+          productTitle: null,
+          productPrice: null,
+          productImage: null,
+        });
+
+        await this.sendFlowModePrompt(senderPhone, cwCtx);
+        return true;
+      } else {
+        // Primeira vez: precisa perguntar o Nicho
+        session = await this.postSessionRepository.createOrUpdate(contactId, {
+          step: PostStep.SELECT_BUSINESS_TYPE,
+          businessType: null,
+          hasHumanModel: null,
+          modelProfile: null,
+          postType: null,
+          templateId: null,
+          colors: null,
+          productTitle: null,
+          productPrice: null,
+          productImage: null,
+        });
+
+        await this.sendBusinessTypePrompt(
+          senderPhone,
+          "Olá! 🚀 Bem-vindo ao Gerador de Posts kel-IA!\n\nQual é o segmento/nicho do seu negócio?",
+          cwCtx
+        );
+        return true;
+      }
     }
 
     // --- PASSO 1: Escolha do Nicho ➔ IA pergunta se é Rápido ou Personalizado ---
@@ -257,13 +286,11 @@ export class PostFlowService {
 
       const modeStr = isQuick ? "quick" : "custom";
 
-      // Armazena temporariamente se o fluxo é rápido ou personalizado em templateId
       session = await this.postSessionRepository.createOrUpdate(contactId, {
         step: PostStep.SELECT_FLOW_MODE,
         templateId: modeStr,
       });
 
-      // Se for Moda, adiciona a seleção se quer usar Modelo ou Foto Real
       if (session.businessType === "moda") {
         session = await this.postSessionRepository.createOrUpdate(contactId, {
           step: PostStep.SELECT_FASHION_PRESENTATION,
@@ -272,7 +299,6 @@ export class PostFlowService {
         return true;
       }
 
-      // Se não for Moda, avança direto para a seleção de quantidade de produtos / tipo de post
       session = await this.postSessionRepository.createOrUpdate(contactId, {
         step: PostStep.SELECT_POST_TYPE,
       });
@@ -380,7 +406,7 @@ export class PostFlowService {
         session = await this.postSessionRepository.createOrUpdate(contactId, {
           step: PostStep.INPUT_IMAGE,
           postType: selectedPostType,
-          templateId: "food-promo", // default
+          templateId: "food-promo",
           colors: null,
           productTitle: null,
           productPrice: null,
@@ -396,7 +422,7 @@ export class PostFlowService {
         session = await this.postSessionRepository.createOrUpdate(contactId, {
           step: PostStep.SELECT_TEMPLATE,
           postType: selectedPostType,
-          templateId: null, // Limpa o "custom" temporário
+          templateId: null,
         });
 
         await this.sendTemplatesMenu(contactId, senderPhone, session.businessType, cwCtx);
@@ -426,7 +452,7 @@ export class PostFlowService {
       return true;
     }
 
-    // --- PASSO 5 (Custom): Digitação das Cores ➔ Vai direto para INPUT_IMAGE (mesmo comportamento do Post Rápido) ---
+    // --- PASSO 5 (Custom): Digitação das Cores ➔ Vai direto para INPUT_IMAGE ---
     if (session.step === PostStep.INPUT_COLORS) {
       let savedColors: string | null = cleanText;
       const isSkip = ["pular", "deixar a ia escolher", "ia escolher", "padrao", "padrão", "não", "nao", "ignorar"].some((word) => cleanLower === word || cleanLower.includes(word));
@@ -770,12 +796,9 @@ export class PostFlowService {
         cwCtx
       );
     } finally {
-      // Limpa os dados temporários e redefine para o início do fluxo de Nicho
+      // Limpa os dados temporários e redefine preservando o Nicho salvo
       await this.postSessionRepository.createOrUpdate(contactId, {
-        step: PostStep.SELECT_BUSINESS_TYPE,
-        businessType: null,
-        hasHumanModel: null,
-        modelProfile: null,
+        step: PostStep.SELECT_FLOW_MODE,
         postType: null,
         templateId: null,
         colors: null,
