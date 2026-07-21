@@ -55,6 +55,26 @@ export class PostFlowService {
   ) {}
 
   /**
+   * Verifica se a mensagem é um comando para encerrar ou cancelar o fluxo de post
+   */
+  isCancellationCommand(text: string): boolean {
+    const clean = text.trim().toLowerCase();
+    const cancelWords = [
+      "cancelar",
+      "sair",
+      "parar",
+      "encerrar",
+      "finalizar",
+      "fim",
+      "desistir",
+      "parar fluxo",
+      "encerrar fluxo",
+      "cancelar fluxo",
+    ];
+    return cancelWords.some((word) => clean === word || clean.startsWith(word));
+  }
+
+  /**
    * Verifica se a mensagem é um comando para alterar o nicho do negócio
    */
   isNichoChangeCommand(text: string): boolean {
@@ -141,12 +161,12 @@ export class PostFlowService {
     const hasSession = Boolean(session);
     const isTrigger = this.isTriggerMessage(cleanText, hasSession);
 
-    // Tratar comando de cancelamento a qualquer momento
-    if (session && (cleanLower === "cancelar" || cleanLower === "sair" || cleanLower === "parar")) {
+    // --- COMANDO DE CANCELAMENTO OU ENCERRAMENTO DO FLUXO ---
+    if (session && this.isCancellationCommand(cleanText)) {
       await this.postSessionRepository.deleteByContactId(contactId);
       await this.whatsappService.sendText(
         senderPhone,
-        "❌ *Fluxo de criação de post cancelado.*\n\nComo posso te ajudar agora?",
+        "❌ *Fluxo de criação de post encerrado.*\n\nQuando quiser criar um novo post, basta digitar *'novo post'* ou me enviar a foto do produto com o preço na legenda!",
         cwCtx
       );
       return true;
@@ -156,6 +176,9 @@ export class PostFlowService {
     if (this.isNichoChangeCommand(cleanText)) {
       session = await this.postSessionRepository.createOrUpdate(contactId, {
         step: PostStep.SELECT_BUSINESS_TYPE,
+        productTitle: null,
+        productPrice: null,
+        productImage: null,
       });
 
       let changeNichoMsg = "🔄 *Alterar Segmento / Nicho do Negócio*\n\n";
@@ -173,6 +196,9 @@ export class PostFlowService {
     if (this.isPostTypeChangeCommand(cleanText)) {
       session = await this.postSessionRepository.createOrUpdate(contactId, {
         step: PostStep.SELECT_POST_TYPE,
+        productTitle: null,
+        productPrice: null,
+        productImage: null,
       });
 
       let postTypeMsg = "📌 *Escolha o Tipo de Post*\n\n";
@@ -193,6 +219,7 @@ export class PostFlowService {
         return false;
       }
 
+      // Reinicia a sessão limpando imagens e títulos anteriores
       session = await this.postSessionRepository.createOrUpdate(contactId, {
         step: PostStep.SELECT_FLOW_MODE,
         businessType: session?.businessType ?? null,
@@ -220,6 +247,9 @@ export class PostFlowService {
         await this.postSessionRepository.createOrUpdate(contactId, {
           step: PostStep.INPUT_IMAGE,
           templateId: session.templateId || "food-promo",
+          productTitle: null,
+          productPrice: null,
+          productImage: null,
         });
 
         let fastMsg = "⚡ *Modo Post Rápido Ativado!*\n\n";
@@ -240,6 +270,9 @@ export class PostFlowService {
         if (!session.businessType) {
           await this.postSessionRepository.createOrUpdate(contactId, {
             step: PostStep.SELECT_BUSINESS_TYPE,
+            productTitle: null,
+            productPrice: null,
+            productImage: null,
           });
 
           let welcomeMsg = "🎨 *Modo Post Personalizado*\n\n";
@@ -252,9 +285,11 @@ export class PostFlowService {
           await this.whatsappService.sendText(senderPhone, welcomeMsg, cwCtx);
           return true;
         } else {
-          // Se o nicho já foi configurado, avança para escolher o Tipo de Post
           await this.postSessionRepository.createOrUpdate(contactId, {
             step: PostStep.SELECT_POST_TYPE,
+            productTitle: null,
+            productPrice: null,
+            productImage: null,
           });
 
           let postTypeMsg = "📌 *Tipo de Post*\n\n";
@@ -303,7 +338,6 @@ export class PostFlowService {
         return true;
       }
 
-      // Para outros nichos, avança para a escolha do Tipo de Post
       await this.postSessionRepository.createOrUpdate(contactId, {
         step: PostStep.SELECT_POST_TYPE,
         businessType: selectedBusinessType,
@@ -357,7 +391,7 @@ export class PostFlowService {
       }
     }
 
-    // --- ETAPA MODA 3: Modelo Virtual (Mulher, Homem, Criança) ---
+    // --- ETAPA MODA 3: Modelo Virtual ---
     if (session.step === PostStep.SELECT_FASHION_MODEL) {
       let selectedModelProfile = "woman";
 
@@ -386,7 +420,7 @@ export class PostFlowService {
       return true;
     }
 
-    // --- ETAPA: Seleção do Tipo de Post (1. Produto Único, 2. Combo, 3. Promoção, 4. Encarte) ---
+    // --- ETAPA: Seleção do Tipo de Post ---
     if (session.step === PostStep.SELECT_POST_TYPE) {
       let selectedPostType = "produto";
 
@@ -399,8 +433,6 @@ export class PostFlowService {
       } else {
         selectedPostType = "produto";
       }
-
-      const postTypeDisplay = getPostTypeDisplayName(selectedPostType);
 
       await this.postSessionRepository.createOrUpdate(contactId, {
         step: PostStep.SELECT_TEMPLATE,
@@ -700,12 +732,17 @@ export class PostFlowService {
         cwCtx
       );
     } finally {
+      // Limpa os dados temporários do produto (imagem, título, preço) ao encerrar o fluxo
       await this.postSessionRepository.createOrUpdate(contactId, {
         step: PostStep.SELECT_FLOW_MODE,
         businessType: session?.businessType ?? null,
         hasHumanModel: session?.hasHumanModel ?? null,
         modelProfile: session?.modelProfile ?? null,
         postType: session?.postType ?? "produto",
+        productTitle: null,
+        productPrice: null,
+        productImage: null,
+        templateId: null,
       });
     }
   }
