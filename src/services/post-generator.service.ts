@@ -34,7 +34,7 @@ CTA:
 {{cta}}
 
 --------------------------------------------------
-IDENTIDADE DA MARCA
+IDENTIDADE DA MARCA E CONTATO
 --------------------------------------------------
 
 Cor Principal:
@@ -42,6 +42,15 @@ Cor Principal:
 
 Cor Secundária:
 {{secondary_color}}
+
+Logotipo da Marca:
+{{logo_url}}
+
+WhatsApp / Telefone de Contato:
+{{contact_number}}
+
+Perfil do Instagram:
+{{instagram_profile}}
 
 --------------------------------------------------
 PRODUTO
@@ -57,6 +66,7 @@ REGRAS OBRIGATÓRIAS
 • O produto deve permanecer exatamente igual ao original.
 • O produto é sempre o protagonista absoluto.
 • NUNCA invente novos produtos.
+• Insira o contato do Instagram ({{instagram_profile}}) e o WhatsApp/Telefone de contato ({{contact_number}}) de forma elegante, discreta e minimalista nas margens ou rodapé da arte, preferencialmente acompanhados de ícones correspondentes.
 `;
 
 function buildExactGeradorPostsPrompt(
@@ -74,6 +84,7 @@ function buildExactGeradorPostsPrompt(
   prompt = prompt.replace("{{primary_color}}", "#4f46e5");
   prompt = prompt.replace("{{secondary_color}}", "#f59e0b");
   prompt = prompt.replace("{{product_description}}", `Use o produto como o elemento principal da composição.`);
+
   const contactText = (userProfile?.contactNumber && userProfile.contactNumber.trim() && userProfile.contactNumber !== "Não fornecido")
     ? `Inclua o número de telefone de contato '${userProfile.contactNumber.trim()}' no post.`
     : "NÃO inclua nenhum número de telefone ou WhatsApp na imagem do post, pois o usuário não possui telefone de contato cadastrado.";
@@ -119,37 +130,41 @@ export class PostGeneratorService {
 
     const productImagesJson = JSON.stringify([base64Image]);
 
+    console.log(`[PostGeneratorService] Dados do Perfil para Inclusão na Arte -> Telefone: "${data.userProfile?.contactNumber || 'N/A'}" | Instagram: "${data.userProfile?.instagramProfile || 'N/A'}"`);
+
     // 1. Tentar gerar através da API da aplicação gerador-posts-ia (que usa gpt-image-2 e os prompts oficiais)
-    try {
-      console.log(`[PostGeneratorService] Conectando ao gerador-posts-ia em ${env.geradorPostsApiUrl}/api/generate-post...`);
+    if (env.geradorPostsApiUrl && !env.geradorPostsApiUrl.includes("localhost")) {
+      try {
+        console.log(`[PostGeneratorService] Conectando ao gerador-posts-ia em ${env.geradorPostsApiUrl}/api/generate-post...`);
 
-      const apiResponse = await axios.post(
-        `${env.geradorPostsApiUrl}/api/generate-post`,
-        {
-          templateId: template.id,
-          productName: data.productTitle,
-          price: data.productPrice,
-          dimension: "1:1",
-          hasHumanModel: Boolean(data.hasHumanModel),
-          humanModelGender: data.humanModelGender || "woman",
-          postType: data.postType || "produto",
-          productImages: productImagesJson,
-          contactNumber: data.userProfile?.contactNumber,
-          instagramProfile: data.userProfile?.instagramProfile,
-          logoUrl: data.userProfile?.logoUrl,
-        },
-        { timeout: 120000 }
-      );
+        const apiResponse = await axios.post(
+          `${env.geradorPostsApiUrl}/api/generate-post`,
+          {
+            templateId: template.id,
+            productName: data.productTitle,
+            price: data.productPrice,
+            dimension: "1:1",
+            hasHumanModel: Boolean(data.hasHumanModel),
+            humanModelGender: data.humanModelGender || "woman",
+            postType: data.postType || "produto",
+            productImages: productImagesJson,
+            contactNumber: data.userProfile?.contactNumber,
+            instagramProfile: data.userProfile?.instagramProfile,
+            logoUrl: data.userProfile?.logoUrl,
+          },
+          { timeout: 120000 }
+        );
 
-      if (apiResponse.data?.success && apiResponse.data?.imageUrl) {
-        console.log(`[PostGeneratorService] Post gerado com SUCESSO via gerador-posts-ia (gpt-image-2)! URL: ${apiResponse.data.imageUrl}`);
-        return {
-          imageUrl: apiResponse.data.imageUrl,
-          prompt: apiResponse.data.revisedPrompt || "Gerado via gerador-posts-ia API (gpt-image-2)",
-        };
+        if (apiResponse.data?.success && apiResponse.data?.imageUrl) {
+          console.log(`[PostGeneratorService] Post gerado com SUCESSO via gerador-posts-ia (gpt-image-2)! URL: ${apiResponse.data.imageUrl}`);
+          return {
+            imageUrl: apiResponse.data.imageUrl,
+            prompt: apiResponse.data.revisedPrompt || "Gerado via gerador-posts-ia API (gpt-image-2)",
+          };
+        }
+      } catch (apiError: any) {
+        console.warn(`[PostGeneratorService] Conexão com gerador-posts-ia falhou (${apiError.message}). Executando fallback com gpt-image-2 usando o prompt oficial do template...`);
       }
-    } catch (apiError: any) {
-      console.warn(`[PostGeneratorService] Conexão com gerador-posts-ia falhou (${apiError.message}). Executando fallback com gpt-image-2 usando o prompt oficial do template...`);
     }
 
     // 2. Fallback usando o prompt oficial do gerador-posts-ia e o modelo gpt-image-2

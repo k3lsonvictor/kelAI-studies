@@ -40,7 +40,8 @@ export class WebhookController {
       postSessionRepository,
       whatsappService,
       postGeneratorService,
-      aiService
+      aiService,
+      supabaseProfileService
     );
 
     // 4. Injeção no orquestrador MessageService

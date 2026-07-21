@@ -46,12 +46,15 @@ function getPostTypeDisplayName(postType?: string | null): string {
   return "Produto Único";
 }
 
+import type { SupabaseProfileService } from "./supabase-profile.service.js";
+
 export class PostFlowService {
   constructor(
     private readonly postSessionRepository: PostSessionRepository,
     private readonly whatsappService: WhatsAppService,
     private readonly postGeneratorService: PostGeneratorService,
-    private readonly aiService?: AIService
+    private readonly aiService?: AIService,
+    private readonly supabaseProfileService?: SupabaseProfileService
   ) {}
 
   /**
@@ -736,6 +739,14 @@ export class PostFlowService {
     const productTitle = session?.productTitle || "Vestido Linho Verde";
     const productPrice = session?.productPrice || "R$ 149,90";
     const productImage = session?.productImage || null;
+
+    if (!userProfile && this.supabaseProfileService) {
+      const auth = await this.supabaseProfileService.getProfileByPhone(senderPhone);
+      if (auth.profile) {
+        userProfile = auth.profile;
+        console.log(`[PostFlowService] Perfil do Supabase obtido no momento da geração para ${senderPhone}. Instagram: "${userProfile.instagramProfile}"`);
+      }
+    }
 
     try {
       console.log(`[PostFlowService] Gerando arte para ${senderPhone} (Nicho: ${category.name} | Produto: ${productTitle} | Tipo: ${session?.postType || "produto"})...`);
