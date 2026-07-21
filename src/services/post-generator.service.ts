@@ -74,8 +74,16 @@ function buildExactGeradorPostsPrompt(
   prompt = prompt.replace("{{primary_color}}", "#4f46e5");
   prompt = prompt.replace("{{secondary_color}}", "#f59e0b");
   prompt = prompt.replace("{{product_description}}", `Use o produto como o elemento principal da composição.`);
-  prompt = prompt.replace("{{contact_number}}", userProfile?.contactNumber || "Não fornecido");
-  prompt = prompt.replace("{{instagram_profile}}", userProfile?.instagramProfile || "Não fornecido");
+  const contactText = (userProfile?.contactNumber && userProfile.contactNumber.trim() && userProfile.contactNumber !== "Não fornecido")
+    ? `Inclua o número de telefone de contato '${userProfile.contactNumber.trim()}' no post.`
+    : "NÃO inclua nenhum número de telefone ou WhatsApp na imagem do post, pois o usuário não possui telefone de contato cadastrado.";
+
+  const instagramText = (userProfile?.instagramProfile && userProfile.instagramProfile.trim() && userProfile.instagramProfile !== "Não fornecido")
+    ? `Inclua o perfil do Instagram '${userProfile.instagramProfile.trim()}' no post.`
+    : "NÃO inclua nenhum perfil ou arroba do Instagram na imagem do post, pois o usuário não possui Instagram cadastrado. Deixe a arte totalmente sem arroba ou ícone do Instagram.";
+
+  prompt = prompt.replace("{{contact_number}}", contactText);
+  prompt = prompt.replace("{{instagram_profile}}", instagramText);
   prompt = prompt.replace("{{logo_url}}", userProfile?.logoUrl || "Não fornecido");
   return prompt;
 }
