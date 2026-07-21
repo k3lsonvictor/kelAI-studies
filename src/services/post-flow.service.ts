@@ -783,6 +783,11 @@ export class PostFlowService {
       let finalDeliveryMsg = "Sua arte tá pronta! 🔥\n\n";
       finalDeliveryMsg += "📝 *Sugestão de legenda:*\n\n";
       finalDeliveryMsg += `"Saindo quentinho por aqui! Venha garantir o seu ${productTitle} por apenas ${productPrice}. 😋 #${nichoHashtag} #${sanitizedTitle}"\n\n`;
+
+      if (userProfile && typeof userProfile.credits === "number") {
+        finalDeliveryMsg += `💳 *Créditos disponíveis:* ${userProfile.credits} post(s)\n\n`;
+      }
+
       finalDeliveryMsg += "🔄 Digite *'novo post'* para criar outra arte ou altere o nicho com *'alterar nicho'*!";
 
       await this.whatsappService.sendText(senderPhone, finalDeliveryMsg, cwCtx);

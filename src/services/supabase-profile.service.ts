@@ -10,6 +10,7 @@ export interface SupabaseProfileData {
   primary_color?: string | null;
   secondary_color?: string | null;
   is_approved?: boolean | null;
+  credits?: number | null;
 }
 
 export interface UserProfileInfo {
@@ -19,6 +20,7 @@ export interface UserProfileInfo {
   logoUrl: string;
   primaryColor?: string;
   secondaryColor?: string;
+  credits?: number;
 }
 
 export class SupabaseProfileService {
@@ -30,7 +32,7 @@ export class SupabaseProfileService {
 
   /**
    * Busca e valida se o número de telefone de entrada possui cadastro na tabela `profiles` do Supabase.
-   * Retorna os dados do perfil (número de telefone comercial, @ do Instagram, logo e cores).
+   * Retorna os dados do perfil (número de telefone comercial, @ do Instagram, logo, cores e créditos).
    */
   async getProfileByPhone(rawPhone: string): Promise<{
     isAuthorized: boolean;
@@ -73,7 +75,7 @@ export class SupabaseProfileService {
         return { isAuthorized: false, profile: null };
       }
 
-      console.log(`[SupabaseProfileService] Perfil AUTORIZADO para ${rawPhone}! ID: ${matchedProfile.id} | Instagram: "${matchedProfile.instagram_profile || 'N/A'}" | Telefone: "${matchedProfile.contact_number || rawPhone}"`);
+      console.log(`[SupabaseProfileService] Perfil AUTORIZADO para ${rawPhone}! ID: ${matchedProfile.id} | Instagram: "${matchedProfile.instagram_profile || 'N/A'}" | Créditos: ${matchedProfile.credits ?? 0}`);
 
       return {
         isAuthorized: true,
@@ -84,6 +86,7 @@ export class SupabaseProfileService {
           logoUrl: matchedProfile.logo_url || "",
           primaryColor: matchedProfile.primary_color || undefined,
           secondaryColor: matchedProfile.secondary_color || undefined,
+          credits: matchedProfile.credits ?? 0,
         },
       };
     } catch (err: any) {
