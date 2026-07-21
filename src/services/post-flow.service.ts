@@ -76,8 +76,23 @@ export class PostFlowService {
   /**
    * Verifica se a mensagem é um comando para encerrar ou cancelar o fluxo de post
    */
+  /**
+   * Função auxiliar para normalizar texto de entrada (remove emojis, substitui _ por espaço)
+   */
+  private normalizeInputText(text: string): string {
+    return text
+      .replace(/[\u{1F300}-\u{1F9FF}]|[\u{2600}-\u{26FF}]|[\u{2700}-\u{27BF}]/gu, "")
+      .replace(/_/g, " ")
+      .trim()
+      .toLowerCase();
+  }
+
+  /**
+   * Verifica se a mensagem é um comando de cancelamento ou encerramento
+   */
   isCancellationCommand(text: string): boolean {
     const clean = text.trim().toLowerCase();
+    const normalized = this.normalizeInputText(text);
     const cancelWords = [
       "cancelar",
       "sair",
@@ -92,7 +107,9 @@ export class PostFlowService {
       "agora nao",
       "agora não",
     ];
-    return cancelWords.some((word) => clean === word || clean.startsWith(word));
+    return cancelWords.some((word) =>
+      clean === word || clean.startsWith(word) || normalized === word || normalized.startsWith(word)
+    );
   }
 
   /**
@@ -100,17 +117,24 @@ export class PostFlowService {
    */
   isNichoChangeCommand(text: string): boolean {
     const clean = text.trim().toLowerCase();
+    const normalized = this.normalizeInputText(text);
     const commands = [
       "alterar nicho",
+      "alterar_nicho",
       "mudar nicho",
+      "mudar_nicho",
       "trocar nicho",
+      "trocar_nicho",
       "nicho",
       "segmento",
       "alterar segmento",
       "mudar segmento",
       "trocar segmento",
     ];
-    return commands.some((cmd) => clean === cmd || clean.startsWith(cmd));
+    return commands.some((cmd) =>
+      clean === cmd || clean.startsWith(cmd) || clean.includes(cmd) ||
+      normalized === cmd || normalized.startsWith(cmd) || normalized.includes(cmd)
+    );
   }
 
   /**
@@ -118,6 +142,7 @@ export class PostFlowService {
    */
   isPostTypeChangeCommand(text: string): boolean {
     const clean = text.trim().toLowerCase();
+    const normalized = this.normalizeInputText(text);
     const commands = [
       "alterar tipo",
       "mudar tipo",
@@ -129,7 +154,9 @@ export class PostFlowService {
       "mudar formato",
       "tipo",
     ];
-    return commands.some((cmd) => clean === cmd || clean.startsWith(cmd));
+    return commands.some((cmd) =>
+      clean === cmd || clean.startsWith(cmd) || normalized === cmd || normalized.startsWith(cmd)
+    );
   }
 
   /**
@@ -137,9 +164,11 @@ export class PostFlowService {
    */
   isTriggerMessage(text: string, hasActiveSession: boolean): boolean {
     const clean = text.trim().toLowerCase();
+    const normalized = this.normalizeInputText(text);
     const explicitTriggers = [
       "novo post",
       "novo-post",
+      "novo_post",
       "criar post",
       "gerar post",
       "fazer post",
@@ -149,7 +178,7 @@ export class PostFlowService {
       "recomecar",
     ];
 
-    if (explicitTriggers.some((t) => clean === t || clean.startsWith(t))) {
+    if (explicitTriggers.some((t) => clean === t || clean.startsWith(t) || normalized === t || normalized.startsWith(t))) {
       return true;
     }
 

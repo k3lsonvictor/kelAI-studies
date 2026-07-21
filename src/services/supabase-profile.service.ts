@@ -5,6 +5,8 @@ export interface SupabaseProfileData {
   id: string;
   contact_number?: string | null;
   phone?: string | null;
+  display_phone?: string | null;
+  display_contact_number?: string | null;
   instagram_profile?: string | null;
   logo_url?: string | null;
   primary_color?: string | null;
@@ -92,7 +94,7 @@ export class SupabaseProfileService {
         isAuthorized: true,
         profile: {
           id: matchedProfile.id,
-          contactNumber: matchedProfile.contact_number || matchedProfile.phone || rawPhone,
+          contactNumber: matchedProfile.display_phone || matchedProfile.display_contact_number || matchedProfile.contact_number || matchedProfile.phone || rawPhone,
           instagramProfile: matchedProfile.instagram_profile || "",
           logoUrl: matchedProfile.logo_url || "",
           primaryColor: matchedProfile.primary_color || undefined,
