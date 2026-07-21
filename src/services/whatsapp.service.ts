@@ -1,4 +1,10 @@
 import { WhatsAppClient } from "../integrations/whatsapp/whatsapp.client.js";
+import { sendChatwootMessage } from "../controllers/webhook.controller.js";
+
+export interface ChatwootContext {
+  accountId?: number | string | undefined;
+  conversationId?: number | string | undefined;
+}
 
 export class WhatsAppService {
   private readonly whatsappClient: WhatsAppClient;
@@ -8,23 +14,31 @@ export class WhatsAppService {
   }
 
   /**
-   * Envia uma mensagem de texto simples delegando a chamada para o WhatsAppClient (Graph API)
-   * @param to Número de telefone do destinatário
-   * @param body Corpo do texto da mensagem
+   * Envia uma mensagem de texto simples.
+   * Se for originada do Chatwoot, envia também via API do Chatwoot.
    */
-  async sendText(to: string, body: string) {
+  async sendText(to: string, body: string, chatwootContext?: ChatwootContext) {
     console.log(`[WhatsAppService] Despachando envio de mensagem de texto para ${to}`);
+
+    if (chatwootContext?.accountId && chatwootContext?.conversationId) {
+      await sendChatwootMessage(chatwootContext.accountId, chatwootContext.conversationId, body);
+    }
+
     return this.whatsappClient.sendTextMessage(to, body);
   }
 
   /**
-   * Envia uma mensagem de imagem delegando a chamada para o WhatsAppClient (Graph API)
-   * @param to Número de telefone do destinatário
-   * @param imageUrl URL pública da imagem
-   * @param caption Legenda da imagem (opcional)
+   * Envia uma mensagem de imagem.
+   * Se for originada do Chatwoot, envia também via API do Chatwoot.
    */
-  async sendImage(to: string, imageUrl: string, caption?: string) {
+  async sendImage(to: string, imageUrl: string, caption?: string, chatwootContext?: ChatwootContext) {
     console.log(`[WhatsAppService] Despachando envio de imagem para ${to}`);
+
+    if (chatwootContext?.accountId && chatwootContext?.conversationId) {
+      const chatwootText = caption ? `${caption}\n\n${imageUrl}` : imageUrl;
+      await sendChatwootMessage(chatwootContext.accountId, chatwootContext.conversationId, chatwootText);
+    }
+
     return this.whatsappClient.sendImageMessage(to, imageUrl, caption);
   }
 

@@ -39,7 +39,8 @@ export class WebhookController {
     const postFlowService = new PostFlowService(
       postSessionRepository,
       whatsappService,
-      postGeneratorService
+      postGeneratorService,
+      aiService
     );
 
     // 4. Injeção no orquestrador MessageService
@@ -91,15 +92,21 @@ export class WebhookController {
 
     try {
       // -------------------------------------------------------------
-      // FLUXO 1: WEBHOOK DO CHATWOOT
+      // FLUXO 1: WEBHOOK DO CHATWOOT (message_created, message_updated, etc.)
       // -------------------------------------------------------------
-      if (body.event === "message_created" || body.event === "conversation_updated") {
+      const isChatwootPayload = Boolean(
+        body.event || body.conversation || body.account || body.message_type !== undefined
+      );
+
+      if (isChatwootPayload) {
         // Processa apenas mensagens vindas do cliente (incoming) e não privadas
-        if (body.message_type === "incoming" && !body.private) {
-          const userMessage = body.content || "";
+        const isIncoming = (body.message_type === "incoming" || body.message_type === 0) && !body.private;
+
+        if (isIncoming) {
+          const userMessage = body.content || body.conversation?.messages?.[0]?.content || "";
           const conversationId = body.conversation?.id;
           const accountId = body.account?.id;
-          const senderPhone = body.sender?.phone_number || body.conversation?.meta?.sender?.phone_number || "";
+          const senderPhone = body.conversation?.meta?.sender?.phone_number || body.conversation?.contact_inbox?.source_id || body.sender?.phone_number || "";
 
           request.log.info(
             { conversationId, senderPhone, userMessage },
@@ -110,19 +117,29 @@ export class WebhookController {
           let mediaUrl: string | undefined = undefined;
           let caption: string | undefined = undefined;
 
-          if (body.attachments && body.attachments.length > 0) {
-            const attachment = body.attachments[0];
-            if (attachment.file_type === "image" || attachment.data_url?.match(/\.(jpg|jpeg|png|webp)/i)) {
+          // Extrai anexos de múltiplas localizações no payload do Chatwoot
+          const attachments =
+            body.attachments ||
+            body.conversation?.messages?.[0]?.attachments ||
+            body.messages?.[0]?.attachments ||
+            [];
+
+          if (attachments && attachments.length > 0) {
+            const attachment = attachments[0];
+            const isImgType = attachment.file_type === "image" || attachment.file_type === "image/png" || attachment.file_type === "image/jpeg" || attachment.file_type === "file";
+            const isImgUrl = Boolean(attachment.data_url?.match(/\.(jpg|jpeg|png|webp)/i)) || Boolean(attachment.thumb_url);
+
+            if (isImgType || isImgUrl) {
               msgType = "image";
-              mediaUrl = attachment.data_url;
-              caption = userMessage;
+              mediaUrl = attachment.data_url || attachment.thumb_url;
+              caption = userMessage && userMessage !== "[Imagem]" ? userMessage : "";
             }
           }
 
           // Cria um objeto DTO normalizado para o MessageService
           const normalizedMsg = {
             senderPhone: senderPhone.replace(/^\+/, ""),
-            senderName: body.sender?.name || "Cliente",
+            senderName: body.conversation?.meta?.sender?.name || body.sender?.name || "Cliente",
             messageId: body.id ? String(body.id) : `cw_${Date.now()}`,
             timestamp: new Date(),
             type: msgType,
