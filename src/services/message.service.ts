@@ -121,66 +121,78 @@ export class MessageService {
       console.warn(`[MessageService] Aviso ao salvar mensagem de entrada no banco: ${dbErr.message || dbErr}`);
     }
 
-    // 5. Verificar se a mensagem pertence ou inicia o fluxo interativo de criação de posts
-    if (this.postFlowService) {
-      const handledByPostFlow = await this.postFlowService.handlePostFlow(
-        contact.id,
-        incomingDto,
-        userProfile
-      );
-
-      if (handledByPostFlow) {
-        console.log(`[MessageService] Mensagem processada pelo fluxo interativo de posts.`);
-        return;
-      }
-    }
-
-    // 6. Buscar histórico de conversação recente
-    console.log(`[MessageService] Buscando histórico conversacional para a conversa ${conversation.id}`);
-    const history = await this.conversationService.getHistory(conversation.id, 10);
-
-    // 7. Gerar resposta pela IA
-    let replyText = "";
-    try {
-      console.log(`[MessageService] Solicitando resposta inteligente ao AIService...`);
-      replyText = await this.aiService.generateResponse(history);
-      console.log(`[MessageService] Resposta da IA gerada com sucesso.`);
-    } catch (error) {
-      console.error(`[MessageService] Falha ao gerar resposta com a OpenAI. Aplicando fallback amigável.`, error);
-      replyText = "Desculpe, estou temporariamente indisponível. Tente novamente em alguns minutos.";
-    }
-
-    // 8. Enviar a resposta gerada para o WhatsApp / Chatwoot
     const cwCtx = (incomingDto.chatwootAccountId && incomingDto.chatwootConversationId)
       ? { accountId: incomingDto.chatwootAccountId, conversationId: incomingDto.chatwootConversationId }
       : undefined;
 
-    let externalResponseId: string | undefined;
-    try {
-      const sendResult = await this.whatsappService.sendText(
-        incomingDto.senderPhone,
-        replyText,
-        cwCtx
-      );
-      externalResponseId = sendResult?.messages?.[0]?.id;
-      console.log(`[MessageService] Resposta despachada via WhatsApp. wamid: ${externalResponseId}`);
-    } catch (error) {
-      console.error(`[MessageService] Falha ao enviar resposta para o WhatsApp`, error);
+    // Ativa o indicador de "typing..." no início do processamento
+    if (cwCtx) {
+      await this.whatsappService.sendTypingIndicator(incomingDto.senderPhone, cwCtx);
     }
 
-    // 9. Salvar a resposta enviada no banco de dados
     try {
-      const savedOutgoing = await this.messageRepository.create({
-        conversationId: conversation.id,
-        direction: "OUTGOING",
-        body: replyText,
-        externalId: externalResponseId ?? null,
-        type: "text",
-        status: externalResponseId ? "sent" : "failed",
-      });
-      console.log(`[MessageService] Resposta de saída salva no banco. ID: ${savedOutgoing.id}`);
-    } catch (dbErr: any) {
-      console.warn(`[MessageService] Aviso ao salvar mensagem de saída no banco: ${dbErr.message || dbErr}`);
+      // 5. Verificar se a mensagem pertence ou inicia o fluxo interativo de criação de posts
+      if (this.postFlowService) {
+        const handledByPostFlow = await this.postFlowService.handlePostFlow(
+          contact.id,
+          incomingDto,
+          userProfile
+        );
+
+        if (handledByPostFlow) {
+          console.log(`[MessageService] Mensagem processada pelo fluxo interativo de posts.`);
+          return;
+        }
+      }
+
+      // 6. Buscar histórico de conversação recente
+      console.log(`[MessageService] Buscando histórico conversacional para a conversa ${conversation.id}`);
+      const history = await this.conversationService.getHistory(conversation.id, 10);
+
+      // 7. Gerar resposta pela IA
+      let replyText = "";
+      try {
+        console.log(`[MessageService] Solicitando resposta inteligente ao AIService...`);
+        replyText = await this.aiService.generateResponse(history);
+        console.log(`[MessageService] Resposta da IA gerada com sucesso.`);
+      } catch (error) {
+        console.error(`[MessageService] Falha ao gerar resposta com a OpenAI. Aplicando fallback amigável.`, error);
+        replyText = "Desculpe, estou temporariamente indisponível. Tente novamente em alguns minutos.";
+      }
+
+      // 8. Enviar a resposta gerada para o WhatsApp / Chatwoot
+      let externalResponseId: string | undefined;
+      try {
+        const sendResult = await this.whatsappService.sendText(
+          incomingDto.senderPhone,
+          replyText,
+          cwCtx
+        );
+        externalResponseId = sendResult?.messages?.[0]?.id;
+        console.log(`[MessageService] Resposta despachada via WhatsApp. wamid: ${externalResponseId}`);
+      } catch (error) {
+        console.error(`[MessageService] Falha ao enviar resposta para o WhatsApp`, error);
+      }
+
+      // 9. Salvar a resposta enviada no banco de dados
+      try {
+        const savedOutgoing = await this.messageRepository.create({
+          conversationId: conversation.id,
+          direction: "OUTGOING",
+          body: replyText,
+          externalId: externalResponseId ?? null,
+          type: "text",
+          status: externalResponseId ? "sent" : "failed",
+        });
+        console.log(`[MessageService] Resposta de saída salva no banco. ID: ${savedOutgoing.id}`);
+      } catch (dbErr: any) {
+        console.warn(`[MessageService] Aviso ao salvar mensagem de saída no banco: ${dbErr.message || dbErr}`);
+      }
+    } finally {
+      // Desativa o indicador de "typing..." ao final do envio
+      if (cwCtx) {
+        await this.whatsappService.stopTypingIndicator(incomingDto.senderPhone, cwCtx);
+      }
     }
   }
 

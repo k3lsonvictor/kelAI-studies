@@ -278,6 +278,39 @@ export async function sendChatwootMessage(
 }
 
 /**
+ * Alterna o estado de digitação ("typing...") no Chatwoot para simular que o bot está formulando a resposta.
+ */
+export async function toggleChatwootTyping(
+  accountId: number | string,
+  conversationId: number | string,
+  status: "on" | "off"
+) {
+  const chatwootUrl = env.chatwootUrl;
+  const chatwootToken = env.chatwootToken;
+
+  if (!chatwootUrl || !chatwootToken) return;
+
+  try {
+    const res = await fetch(`${chatwootUrl}/api/v1/accounts/${accountId}/conversations/${conversationId}/toggle_typing`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "api_access_token": chatwootToken,
+      },
+      body: JSON.stringify({
+        typing_status: status,
+      }),
+    });
+
+    if (!res.ok) {
+      console.warn(`[Chatwoot] Erro ao alternar indicador de digitação (${res.status})`);
+    }
+  } catch (err: any) {
+    console.warn(`[Chatwoot] Exceção ao alternar indicador de digitação:`, err.message || err);
+  }
+}
+
+/**
  * Função utilitária exportada para enviar mensagens de seleção/botões interativos de volta ao Chatwoot
  */
 export async function sendChatwootInteractiveMessage(

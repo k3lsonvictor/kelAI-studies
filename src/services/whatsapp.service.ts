@@ -3,6 +3,7 @@ import {
   sendChatwootMessage,
   sendChatwootImageMessage,
   sendChatwootInteractiveMessage,
+  toggleChatwootTyping,
 } from "../controllers/webhook.controller.js";
 
 export interface ChatwootContext {
@@ -15,6 +16,24 @@ export class WhatsAppService {
 
   constructor() {
     this.whatsappClient = new WhatsAppClient();
+  }
+
+  /**
+   * Ativa o indicador de digitação ("typing...") no Chatwoot.
+   */
+  async sendTypingIndicator(to: string, chatwootContext?: ChatwootContext) {
+    if (chatwootContext?.accountId && chatwootContext?.conversationId) {
+      await toggleChatwootTyping(chatwootContext.accountId, chatwootContext.conversationId, "on");
+    }
+  }
+
+  /**
+   * Desativa o indicador de digitação no Chatwoot.
+   */
+  async stopTypingIndicator(to: string, chatwootContext?: ChatwootContext) {
+    if (chatwootContext?.accountId && chatwootContext?.conversationId) {
+      await toggleChatwootTyping(chatwootContext.accountId, chatwootContext.conversationId, "off");
+    }
   }
 
   /**
