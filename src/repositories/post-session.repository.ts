@@ -13,6 +13,8 @@ export class PostSessionRepository {
     data: {
       step: PostStep;
       businessType?: string | null;
+      hasHumanModel?: boolean | null;
+      modelProfile?: string | null;
       templateId?: string | null;
       productTitle?: string | null;
       productPrice?: string | null;
@@ -25,6 +27,8 @@ export class PostSessionRepository {
         contactId,
         step: data.step,
         businessType: data.businessType ?? null,
+        hasHumanModel: data.hasHumanModel ?? null,
+        modelProfile: data.modelProfile ?? null,
         templateId: data.templateId ?? null,
         productTitle: data.productTitle ?? null,
         productPrice: data.productPrice ?? null,
@@ -33,6 +37,8 @@ export class PostSessionRepository {
       update: {
         step: data.step,
         ...(data.businessType !== undefined && { businessType: data.businessType }),
+        ...(data.hasHumanModel !== undefined && { hasHumanModel: data.hasHumanModel }),
+        ...(data.modelProfile !== undefined && { modelProfile: data.modelProfile }),
         ...(data.templateId !== undefined && { templateId: data.templateId }),
         ...(data.productTitle !== undefined && { productTitle: data.productTitle }),
         ...(data.productPrice !== undefined && { productPrice: data.productPrice }),

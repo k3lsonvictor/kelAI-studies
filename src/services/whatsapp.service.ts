@@ -1,5 +1,5 @@
 import { WhatsAppClient } from "../integrations/whatsapp/whatsapp.client.js";
-import { sendChatwootMessage } from "../controllers/webhook.controller.js";
+import { sendChatwootMessage, sendChatwootImageMessage } from "../controllers/webhook.controller.js";
 
 export interface ChatwootContext {
   accountId?: number | string | undefined;
@@ -15,13 +15,15 @@ export class WhatsAppService {
 
   /**
    * Envia uma mensagem de texto simples.
-   * Se for originada do Chatwoot, envia também via API do Chatwoot.
+   * Se a conversa originou do Chatwoot, envia EXCLUSIVAMENTE via API do Chatwoot
+   * (evitando mensagens duplicadas por enviar à Meta e ao Chatwoot simultaneamente).
    */
   async sendText(to: string, body: string, chatwootContext?: ChatwootContext) {
-    console.log(`[WhatsAppService] Despachando envio de mensagem de texto para ${to}`);
+    console.log(`[WhatsAppService] Despachando mensagem de texto para ${to}`);
 
     if (chatwootContext?.accountId && chatwootContext?.conversationId) {
       await sendChatwootMessage(chatwootContext.accountId, chatwootContext.conversationId, body);
+      return { messages: [{ id: `cw_sent_${Date.now()}` }] };
     }
 
     return this.whatsappClient.sendTextMessage(to, body);
@@ -29,14 +31,14 @@ export class WhatsAppService {
 
   /**
    * Envia uma mensagem de imagem.
-   * Se for originada do Chatwoot, envia também via API do Chatwoot.
+   * Se a conversa originou do Chatwoot, envia como anexo multipart via API do Chatwoot.
    */
   async sendImage(to: string, imageUrl: string, caption?: string, chatwootContext?: ChatwootContext) {
-    console.log(`[WhatsAppService] Despachando envio de imagem para ${to}`);
+    console.log(`[WhatsAppService] Despachando imagem para ${to}`);
 
     if (chatwootContext?.accountId && chatwootContext?.conversationId) {
-      const chatwootText = caption ? `${caption}\n\n${imageUrl}` : imageUrl;
-      await sendChatwootMessage(chatwootContext.accountId, chatwootContext.conversationId, chatwootText);
+      await sendChatwootImageMessage(chatwootContext.accountId, chatwootContext.conversationId, imageUrl, caption);
+      return { messages: [{ id: `cw_sent_img_${Date.now()}` }] };
     }
 
     return this.whatsappClient.sendImageMessage(to, imageUrl, caption);
