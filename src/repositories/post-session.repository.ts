@@ -17,6 +17,7 @@ export class PostSessionRepository {
       modelProfile?: string | null;
       postType?: string | null;
       templateId?: string | null;
+      colors?: string | null;
       productTitle?: string | null;
       productPrice?: string | null;
       productImage?: string | null;
@@ -32,6 +33,7 @@ export class PostSessionRepository {
         modelProfile: data.modelProfile ?? null,
         postType: data.postType ?? null,
         templateId: data.templateId ?? null,
+        colors: data.colors ?? null,
         productTitle: data.productTitle ?? null,
         productPrice: data.productPrice ?? null,
         productImage: data.productImage ?? null,
@@ -43,6 +45,7 @@ export class PostSessionRepository {
         ...(data.modelProfile !== undefined && { modelProfile: data.modelProfile }),
         ...(data.postType !== undefined && { postType: data.postType }),
         ...(data.templateId !== undefined && { templateId: data.templateId }),
+        ...(data.colors !== undefined && { colors: data.colors }),
         ...(data.productTitle !== undefined && { productTitle: data.productTitle }),
         ...(data.productPrice !== undefined && { productPrice: data.productPrice }),
         ...(data.productImage !== undefined && { productImage: data.productImage }),

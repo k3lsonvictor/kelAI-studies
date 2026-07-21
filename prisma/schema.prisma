@@ -61,6 +61,7 @@ enum PostStep {
   SELECT_FASHION_MODEL
   SELECT_POST_TYPE
   SELECT_TEMPLATE
+  INPUT_COLORS
   INPUT_TITLE
   INPUT_PRICE
   INPUT_IMAGE
@@ -76,6 +77,7 @@ model PostSession {
   modelProfile        String?  @map("model_profile")
   postType            String?  @map("post_type")
   templateId          String?  @map("template_id")
+  colors              String?  @map("colors")
   productTitle        String?  @map("product_title")
   productPrice        String?  @map("product_price")
   productImage        String?  @map("product_image")

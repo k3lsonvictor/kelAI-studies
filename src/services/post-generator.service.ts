@@ -73,7 +73,8 @@ function buildExactGeradorPostsPrompt(
   basePrompt: string,
   productName: string,
   price: string,
-  userProfile?: { contactNumber?: string; instagramProfile?: string; logoUrl?: string } | null
+  userProfile?: { contactNumber?: string; instagramProfile?: string; logoUrl?: string } | null,
+  colors?: string | null
 ): string {
   let prompt = SYSTEM_PROMPT_TEMPLATE;
   prompt = prompt.replace("{{template_prompt}}", basePrompt);
@@ -81,8 +82,15 @@ function buildExactGeradorPostsPrompt(
   prompt = prompt.replace("{{description}}", `Crie e inclua uma pequena descrição comercial curta, persuasiva e atraente para o produto "${productName}".`);
   prompt = prompt.replace("{{price}}", price);
   prompt = prompt.replace("{{cta}}", "Não fornecido (NÃO inclua nenhum botão de CTA)");
-  prompt = prompt.replace("{{primary_color}}", "#4f46e5");
-  prompt = prompt.replace("{{secondary_color}}", "#f59e0b");
+
+  if (colors && colors.trim()) {
+    prompt = prompt.replace("{{primary_color}}", `Use preferencialmente estas cores especificadas pelo usuário: ${colors.trim()}`);
+    prompt = prompt.replace("{{secondary_color}}", "Use cores complementares harmoniosas com as especificadas.");
+  } else {
+    prompt = prompt.replace("{{primary_color}}", "#4f46e5");
+    prompt = prompt.replace("{{secondary_color}}", "#f59e0b");
+  }
+
   prompt = prompt.replace("{{product_description}}", `Use o produto como o elemento principal da composição.`);
 
   const contactText = (userProfile?.contactNumber && userProfile.contactNumber.trim() && userProfile.contactNumber !== "Não fornecido")
@@ -120,6 +128,7 @@ export class PostGeneratorService {
     postType?: string | null | undefined;
     productImage?: string | null | undefined;
     userProfile?: { contactNumber?: string; instagramProfile?: string; logoUrl?: string } | null | undefined;
+    colors?: string | null | undefined;
   }): Promise<{ imageUrl: string; prompt: string }> {
     const category = getCategoryOrDefault(data.businessType);
     const template = getTemplateOrDefault(category, data.templateId);
@@ -130,7 +139,7 @@ export class PostGeneratorService {
 
     const productImagesJson = JSON.stringify([base64Image]);
 
-    console.log(`[PostGeneratorService] Dados do Perfil para Inclusão na Arte -> Telefone: "${data.userProfile?.contactNumber || 'N/A'}" | Instagram: "${data.userProfile?.instagramProfile || 'N/A'}"`);
+    console.log(`[PostGeneratorService] Dados do Perfil -> Telefone: "${data.userProfile?.contactNumber || 'N/A'}" | Instagram: "${data.userProfile?.instagramProfile || 'N/A'}" | Cores Customizadas: "${data.colors || 'Padrão'}"`);
 
     // 1. Tentar gerar através da API da aplicação gerador-posts-ia (que usa gpt-image-2 e os prompts oficiais)
     if (env.geradorPostsApiUrl && !env.geradorPostsApiUrl.includes("localhost")) {
@@ -151,6 +160,7 @@ export class PostGeneratorService {
             contactNumber: data.userProfile?.contactNumber,
             instagramProfile: data.userProfile?.instagramProfile,
             logoUrl: data.userProfile?.logoUrl,
+            primaryColor: data.colors || "#4f46e5",
           },
           { timeout: 120000 }
         );
@@ -172,7 +182,8 @@ export class PostGeneratorService {
       template.basePrompt,
       data.productTitle,
       data.productPrice,
-      data.userProfile
+      data.userProfile,
+      data.colors
     );
 
     console.log(`[PostGeneratorService] Solicitando geração de imagem com o modelo 'gpt-image-2' usando o prompt oficial do template '${template.title}'...`);

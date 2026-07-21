@@ -15,6 +15,7 @@ import type { IncomingMessageDTO } from "../dto/incoming-message.dto.js";
 import type { UserProfileInfo } from "./supabase-profile.service.js";
 import type { AIService } from "./ai.service.js";
 import { parseTitleAndPriceRegex } from "./ai.service.js";
+import type { SupabaseProfileService } from "./supabase-profile.service.js";
 
 /**
  * Utilitário para baixar imagem a partir de uma URL remota e converter em Base64 Data URL
@@ -45,8 +46,6 @@ function getPostTypeDisplayName(postType?: string | null): string {
   if (postType === "encarte") return "Encarte / Tabela";
   return "Produto Único";
 }
-
-import type { SupabaseProfileService } from "./supabase-profile.service.js";
 
 export class PostFlowService {
   constructor(
@@ -143,7 +142,7 @@ export class PostFlowService {
   }
 
   /**
-   * Orquestra o fluxo de criação de posts com botões e listas interativas no WhatsApp
+   * Orquestra o fluxo de criação de posts seguindo a nova especificação de passos
    */
   async handlePostFlow(
     contactId: string,
@@ -167,16 +166,22 @@ export class PostFlowService {
       await this.postSessionRepository.deleteByContactId(contactId);
       await this.whatsappService.sendText(
         senderPhone,
-        "❌ *Fluxo de criação de post encerrado.*\n\nQuando quiser criar um novo post, basta digitar *'novo post'* ou me enviar a foto do produto com o preço na legenda!",
+        "❌ *Fluxo de criação de post encerrado.*\n\nQuando quiser criar um novo post, basta digitar *'novo post'* ou me enviar a foto do produto!",
         cwCtx
       );
       return true;
     }
 
-    // --- COMANDO DE ALTERAR NICHO ---
+    // --- COMANDO DE ALTERAR NICHO (Reinicia no Nicho) ---
     if (this.isNichoChangeCommand(cleanText)) {
       session = await this.postSessionRepository.createOrUpdate(contactId, {
         step: PostStep.SELECT_BUSINESS_TYPE,
+        businessType: null,
+        hasHumanModel: null,
+        modelProfile: null,
+        postType: null,
+        templateId: null,
+        colors: null,
         productTitle: null,
         productPrice: null,
         productImage: null,
@@ -190,108 +195,34 @@ export class PostFlowService {
       return true;
     }
 
-    // --- COMANDO DE ALTERAR TIPO DE POST ---
-    if (this.isPostTypeChangeCommand(cleanText)) {
-      session = await this.postSessionRepository.createOrUpdate(contactId, {
-        step: PostStep.SELECT_POST_TYPE,
-        productTitle: null,
-        productPrice: null,
-        productImage: null,
-      });
-
-      await this.sendPostTypePrompt(
-        senderPhone,
-        "📌 *Alterar Tipo de Post*\n\nComo você deseja apresentar o seu produto ou oferta?",
-        cwCtx
-      );
-      return true;
-    }
-
-    // --- GATILHO INICIAL OU COMANDO DE NOVO POST ---
+    // --- GATILHO INICIAL: "novo post" ➔ IA pergunta o Nicho ---
     if (!session || isTrigger) {
       if (!session && !isTrigger) {
         return false;
       }
 
       session = await this.postSessionRepository.createOrUpdate(contactId, {
-        step: PostStep.SELECT_FLOW_MODE,
-        businessType: session?.businessType ?? null,
-        hasHumanModel: session?.hasHumanModel ?? null,
-        modelProfile: session?.modelProfile ?? null,
-        postType: session?.postType ?? "produto",
+        step: PostStep.SELECT_BUSINESS_TYPE,
+        businessType: null,
+        hasHumanModel: null,
+        modelProfile: null,
+        postType: null,
+        templateId: null,
+        colors: null,
         productTitle: null,
         productPrice: null,
         productImage: null,
-        templateId: null,
       });
 
-      await this.sendFlowModePrompt(senderPhone, cwCtx);
+      await this.sendBusinessTypePrompt(
+        senderPhone,
+        "Olá! 🚀 Bem-vindo ao Gerador de Posts kel-IA!\n\nQual é o segmento/nicho do seu negócio?",
+        cwCtx
+      );
       return true;
     }
 
-    // --- ETAPA: Processar Seleção do Modo de Criação (Post Rápido vs Personalizado) ---
-    if (session.step === PostStep.SELECT_FLOW_MODE) {
-      if (cleanText === "1" || cleanLower.includes("rapido") || cleanLower.includes("rápido")) {
-        // MODO 1: POST RÁPIDO
-        await this.postSessionRepository.createOrUpdate(contactId, {
-          step: PostStep.INPUT_IMAGE,
-          templateId: session.templateId || "food-promo",
-          productTitle: null,
-          productPrice: null,
-          productImage: null,
-        });
-
-        let fastMsg = "⚡ *Modo Post Rápido Ativado!*\n\n";
-        if (session.businessType === "moda") {
-          fastMsg += "Legal! Agora me mande a foto da peça (esticada na mesa, no cabide ou no manequim) com o Nome e Preço na legenda.\n\n";
-          fastMsg += "💡 *Exemplo:* Vestido Linho Verde R$ 149,90";
-        } else {
-          fastMsg += "Me envie a foto do produto e escreva na legenda da própria foto o Nome e o Preço.\n\n";
-          fastMsg += "💡 *Exemplo:* Bolo de Cenoura R$ 12,00";
-        }
-
-        await this.whatsappService.sendText(senderPhone, fastMsg, cwCtx);
-        return true;
-      }
-
-      if (cleanText === "2" || cleanLower.includes("personalizado") || cleanLower.includes("detalhado")) {
-        // MODO 2: POST PERSONALIZADO
-        if (!session.businessType) {
-          await this.postSessionRepository.createOrUpdate(contactId, {
-            step: PostStep.SELECT_BUSINESS_TYPE,
-            productTitle: null,
-            productPrice: null,
-            productImage: null,
-          });
-
-          await this.sendBusinessTypePrompt(
-            senderPhone,
-            "🎨 *Modo Post Personalizado*\n\nPara eu ajustar os modelos para a sua marca, qual é o seu segmento/nicho?",
-            cwCtx
-          );
-          return true;
-        } else {
-          await this.postSessionRepository.createOrUpdate(contactId, {
-            step: PostStep.SELECT_POST_TYPE,
-            productTitle: null,
-            productPrice: null,
-            productImage: null,
-          });
-
-          await this.sendPostTypePrompt(
-            senderPhone,
-            "📌 *Tipo de Post*\n\nComo você deseja apresentar o seu produto ou oferta?",
-            cwCtx
-          );
-          return true;
-        }
-      }
-
-      await this.sendFlowModePrompt(senderPhone, cwCtx);
-      return true;
-    }
-
-    // --- ETAPA: Seleção de Nicho (Menu Lista) ---
+    // --- PASSO 1: Escolha do Nicho ➔ IA pergunta se é Rápido ou Personalizado ---
     if (session.step === PostStep.SELECT_BUSINESS_TYPE) {
       let selectedBusinessType = "gastronomia";
 
@@ -305,58 +236,100 @@ export class PostFlowService {
         selectedBusinessType = "gastronomia";
       }
 
-      if (selectedBusinessType === "moda") {
-        await this.postSessionRepository.createOrUpdate(contactId, {
-          step: PostStep.SELECT_FASHION_PRESENTATION,
-          businessType: "moda",
-        });
+      session = await this.postSessionRepository.createOrUpdate(contactId, {
+        step: PostStep.SELECT_FLOW_MODE,
+        businessType: selectedBusinessType,
+      });
 
+      await this.sendFlowModePrompt(senderPhone, cwCtx);
+      return true;
+    }
+
+    // --- PASSO 2: Escolha do Modo (Rápido vs Personalizado) ➔ Se Moda, pergunta Modelo/Foto; se não, pergunta postType ---
+    if (session.step === PostStep.SELECT_FLOW_MODE) {
+      const isQuick = cleanText === "1" || cleanLower.includes("rapido") || cleanLower.includes("rápido");
+      const isCustom = cleanText === "2" || cleanLower.includes("personalizado") || cleanLower.includes("detalhado");
+
+      if (!isQuick && !isCustom) {
+        await this.sendFlowModePrompt(senderPhone, cwCtx);
+        return true;
+      }
+
+      const modeStr = isQuick ? "quick" : "custom";
+
+      // Armazena temporariamente se o fluxo é rápido ou personalizado em templateId
+      session = await this.postSessionRepository.createOrUpdate(contactId, {
+        step: PostStep.SELECT_FLOW_MODE,
+        templateId: modeStr,
+      });
+
+      // Se for Moda, adiciona a seleção se quer usar Modelo ou Foto Real
+      if (session.businessType === "moda") {
+        session = await this.postSessionRepository.createOrUpdate(contactId, {
+          step: PostStep.SELECT_FASHION_PRESENTATION,
+        });
         await this.sendFashionPresentationPrompt(senderPhone, cwCtx);
         return true;
       }
 
-      await this.postSessionRepository.createOrUpdate(contactId, {
+      // Se não for Moda, avança direto para a seleção de quantidade de produtos / tipo de post
+      session = await this.postSessionRepository.createOrUpdate(contactId, {
         step: PostStep.SELECT_POST_TYPE,
-        businessType: selectedBusinessType,
-        hasHumanModel: false,
-        modelProfile: null,
       });
 
-      await this.sendPostTypePrompt(
-        senderPhone,
-        `✅ *Nicho configurado como ${getNichoDisplayName(selectedBusinessType)}!*\n\n📌 Escolha o *Tipo de Post*:`,
-        cwCtx
-      );
+      if (isQuick) {
+        await this.sendPostTypePrompt(
+          senderPhone,
+          "⚡ *Modo Post Rápido*\n\nPra quantos produtos é o seu post hoje?",
+          cwCtx
+        );
+      } else {
+        await this.sendPostTypePrompt(
+          senderPhone,
+          "🎨 *Modo Post Personalizado*\n\nComo deseja apresentar o seu produto ou oferta?",
+          cwCtx
+        );
+      }
       return true;
     }
 
-    // --- ETAPA MODA 2: Foto Real vs Modelo Virtual (Botões Interativos) ---
+    // --- PASSO ADICIONAL MODA 1: Foto Real vs Modelo Virtual ---
     if (session.step === PostStep.SELECT_FASHION_PRESENTATION) {
-      if (cleanText === "2" || cleanLower.includes("modelo") || cleanLower.includes("virtual") || cleanLower.includes("ia")) {
-        await this.postSessionRepository.createOrUpdate(contactId, {
+      const isVirtualModel = cleanText === "2" || cleanLower.includes("modelo") || cleanLower.includes("virtual") || cleanLower.includes("ia");
+      const isQuick = session.templateId === "quick";
+
+      if (isVirtualModel) {
+        session = await this.postSessionRepository.createOrUpdate(contactId, {
           step: PostStep.SELECT_FASHION_MODEL,
           hasHumanModel: true,
         });
-
         await this.sendFashionModelPrompt(senderPhone, cwCtx);
         return true;
       } else {
-        await this.postSessionRepository.createOrUpdate(contactId, {
+        session = await this.postSessionRepository.createOrUpdate(contactId, {
           step: PostStep.SELECT_POST_TYPE,
           hasHumanModel: false,
           modelProfile: null,
         });
 
-        await this.sendPostTypePrompt(
-          senderPhone,
-          "Perfeito! Nicho de Moda (Foto Real) configurado!\n\n📌 Escolha o *Tipo de Post*:",
-          cwCtx
-        );
+        if (isQuick) {
+          await this.sendPostTypePrompt(
+            senderPhone,
+            "⚡ *Modo Post Rápido (Moda - Foto Real)*\n\nPra quantos produtos é o seu post hoje?",
+            cwCtx
+          );
+        } else {
+          await this.sendPostTypePrompt(
+            senderPhone,
+            "🎨 *Modo Post Personalizado (Moda - Foto Real)*\n\nComo deseja apresentar o seu produto ou oferta?",
+            cwCtx
+          );
+        }
         return true;
       }
     }
 
-    // --- ETAPA MODA 3: Modelo Virtual (Botões Interativos) ---
+    // --- PASSO ADICIONAL MODA 2: Escolha do Modelo Virtual ---
     if (session.step === PostStep.SELECT_FASHION_MODEL) {
       let selectedModelProfile = "woman";
 
@@ -364,25 +337,32 @@ export class PostFlowService {
         selectedModelProfile = "man";
       } else if (cleanText === "3" || cleanLower.includes("crianca") || cleanLower.includes("criança") || cleanLower.includes("infantil") || cleanLower.includes("kids")) {
         selectedModelProfile = "kids";
-      } else {
-        selectedModelProfile = "woman";
       }
 
-      await this.postSessionRepository.createOrUpdate(contactId, {
+      session = await this.postSessionRepository.createOrUpdate(contactId, {
         step: PostStep.SELECT_POST_TYPE,
-        hasHumanModel: true,
         modelProfile: selectedModelProfile,
       });
 
-      await this.sendPostTypePrompt(
-        senderPhone,
-        "Perfeito! Modelo Virtual selecionado!\n\n📌 Escolha o *Tipo de Post*:",
-        cwCtx
-      );
+      const isQuick = session.templateId === "quick";
+
+      if (isQuick) {
+        await this.sendPostTypePrompt(
+          senderPhone,
+          "⚡ *Modo Post Rápido (Moda - Modelo Virtual)*\n\nPra quantos produtos é o seu post hoje?",
+          cwCtx
+        );
+      } else {
+        await this.sendPostTypePrompt(
+          senderPhone,
+          "🎨 *Modo Post Personalizado (Moda - Modelo Virtual)*\n\nComo deseja apresentar o seu produto ou oferta?",
+          cwCtx
+        );
+      }
       return true;
     }
 
-    // --- ETAPA: Seleção do Tipo de Post (Menu Lista Interativa) ---
+    // --- PASSO 3: Seleção do Tipo de Post (Quantidade de Produtos / Formato) ---
     if (session.step === PostStep.SELECT_POST_TYPE) {
       let selectedPostType = "produto";
 
@@ -392,86 +372,92 @@ export class PostFlowService {
         selectedPostType = "promocao";
       } else if (cleanText === "4" || cleanLower.includes("encarte") || cleanLower.includes("tabela") || cleanLower.includes("lista")) {
         selectedPostType = "encarte";
-      } else {
-        selectedPostType = "produto";
       }
 
-      await this.postSessionRepository.createOrUpdate(contactId, {
-        step: PostStep.SELECT_TEMPLATE,
-        postType: selectedPostType,
-      });
+      const isQuick = session.templateId === "quick";
 
-      await this.sendTemplatesMenu(contactId, senderPhone, session.businessType, cwCtx);
-      return true;
+      if (isQuick) {
+        session = await this.postSessionRepository.createOrUpdate(contactId, {
+          step: PostStep.INPUT_IMAGE,
+          postType: selectedPostType,
+          templateId: "food-promo", // default
+          colors: null,
+          productTitle: null,
+          productPrice: null,
+          productImage: null,
+        });
+
+        let fastMsg = "⚡ *Modo Post Rápido Ativado!*\n\n";
+        fastMsg += "Por favor, me envie agora a *Foto do Produto* e escreva na legenda da foto o **Nome** e o **Preço**.\n\n";
+        fastMsg += "💡 *Exemplo:* Vestido Linho R$ 149,90";
+        await this.whatsappService.sendText(senderPhone, fastMsg, cwCtx);
+        return true;
+      } else {
+        session = await this.postSessionRepository.createOrUpdate(contactId, {
+          step: PostStep.SELECT_TEMPLATE,
+          postType: selectedPostType,
+          templateId: null, // Limpa o "custom" temporário
+        });
+
+        await this.sendTemplatesMenu(contactId, senderPhone, session.businessType, cwCtx);
+        return true;
+      }
     }
 
-    // --- ETAPA: Seleção de Template (Menu Lista Interativa de Templates) ---
+    // --- PASSO 4 (Custom): Seleção de Template ➔ Pergunta quais as cores principais ---
     if (session.step === PostStep.SELECT_TEMPLATE) {
       const category = getCategoryOrDefault(session.businessType);
       const index = parseInt(cleanText, 10);
       const defaultTmpl = category.templates[0] || { id: "food-promo", title: "Template Padrão", description: "Design moderno" };
       const selectedTemplate = category.templates[index - 1] || defaultTmpl;
 
-      await this.postSessionRepository.createOrUpdate(contactId, {
-        step: PostStep.INPUT_TITLE,
+      session = await this.postSessionRepository.createOrUpdate(contactId, {
+        step: PostStep.INPUT_COLORS,
         templateId: selectedTemplate.id,
       });
 
-      let titleMsg = "📝 *Título do Produto / Oferta*\n\n";
-      titleMsg += `Template selecionado: *${selectedTemplate.title}*\n`;
-      titleMsg += `Tipo de post: *${getPostTypeDisplayName(session.postType)}*\n\n`;
-      titleMsg += "Por favor, digite o *Título do Produto* que vai aparecer na arte:\n";
-      titleMsg += "_(Exemplo: Hambúrguer Artesanal Duplo ou Camisa Oversized)_";
+      let colorsMsg = "🎨 *Cores do seu Post*\n\n";
+      colorsMsg += `Template selecionado: *${selectedTemplate.title}*\n\n`;
+      colorsMsg += "Quais são as **cores principais** que você deseja na sua arte?\n";
+      colorsMsg += "Você pode digitar as cores (ex: *'Azul e Branco'*) ou os códigos hexadecimais.\n\n";
+      colorsMsg += "💡 *Dica:* Se preferir que a IA defina as cores automaticamente, basta digitar *'pular'*!";
 
-      await this.whatsappService.sendText(senderPhone, titleMsg, cwCtx);
+      await this.whatsappService.sendText(senderPhone, colorsMsg, cwCtx);
       return true;
     }
 
-    // --- ETAPA: Digitação do Título ---
-    if (session.step === PostStep.INPUT_TITLE) {
-      if (!cleanText) {
-        await this.whatsappService.sendText(senderPhone, "⚠️ Por favor, digite um título válido para o produto.", cwCtx);
-        return true;
+    // --- PASSO 5 (Custom): Digitação das Cores ➔ Vai direto para INPUT_IMAGE (mesmo comportamento do Post Rápido) ---
+    if (session.step === PostStep.INPUT_COLORS) {
+      let savedColors: string | null = cleanText;
+      const isSkip = ["pular", "deixar a ia escolher", "ia escolher", "padrao", "padrão", "não", "nao", "ignorar"].some((word) => cleanLower === word || cleanLower.includes(word));
+
+      if (isSkip) {
+        savedColors = null;
       }
 
-      await this.postSessionRepository.createOrUpdate(contactId, {
-        step: PostStep.INPUT_PRICE,
-        productTitle: cleanText,
-      });
-
-      let priceMsg = "💰 *Valor do Produto*\n\n";
-      priceMsg += `Produto: *${cleanText}*\n\n`;
-      priceMsg += "Agora, informe o *Valor do Produto* ou a condição da promoção:\n";
-      priceMsg += "_(Exemplo: R$ 49,90 ou Apenas R$ 129,00)_";
-
-      await this.whatsappService.sendText(senderPhone, priceMsg, cwCtx);
-      return true;
-    }
-
-    // --- ETAPA: Digitação do Valor ---
-    if (session.step === PostStep.INPUT_PRICE) {
-      await this.postSessionRepository.createOrUpdate(contactId, {
+      session = await this.postSessionRepository.createOrUpdate(contactId, {
         step: PostStep.INPUT_IMAGE,
-        productPrice: cleanText,
+        colors: savedColors,
+        productTitle: null,
+        productPrice: null,
+        productImage: null,
       });
 
       let imageMsg = "📸 *Foto do Produto*\n\n";
-      imageMsg += `Produto: *${session.productTitle}*\n`;
-      imageMsg += `Valor: *${cleanText}*\n\n`;
-
-      if (session.businessType === "moda") {
-        imageMsg += "Legal! Agora me mande a foto da peça (esticada na mesa, no cabide ou no manequim) com o Nome e Preço na legenda.\n\n";
-        imageMsg += "💡 *Exemplo:* Vestido Linho Verde R$ 149,90\n\n";
+      if (savedColors) {
+        imageMsg += `Cores escolhidas: *${savedColors}*\n\n`;
       } else {
-        imageMsg += "Envie agora a *Foto do Produto* aqui no chat! 📷\n\n";
+        imageMsg += "Cores definidas: *Automáticas (IA)* 🎨\n\n";
       }
-      imageMsg += '_(Se preferir que a IA crie a arte do zero sem foto, digite *"pular"*)_';
+      imageMsg += "Por favor, me envie agora a *Foto do Produto* e escreva na legenda da foto o **Nome** e o **Preço**.\n\n";
+      imageMsg += "💡 *Exemplo:* Vestido Linho R$ 149,90\n\n";
+      imageMsg += '_(Se preferir criar a arte do zero sem foto, digite *"pular"*)_';
 
       await this.whatsappService.sendText(senderPhone, imageMsg, cwCtx);
       return true;
     }
 
-    // --- ETAPA: Envio da Foto e Processamento ---
+    // --- PASSO final (Rápido & Custom): Envio da Foto e Processamento ---
     if (session.step === PostStep.INPUT_IMAGE) {
       let base64Image: string | null = session.productImage || null;
       let rawCaption = (incomingMsg.caption || incomingMsg.body || "").trim();
@@ -512,12 +498,8 @@ export class PostFlowService {
         if (!hasCaption) {
           if (isNewImage) {
             let requestTextMsg = "📸 *Foto do Produto Recebida!*\n\n";
-            requestTextMsg += "Para garantirmos uma arte incrível e sem erros, por favor digite o **Nome do Produto** e o **Preço**.\n\n";
-            if (session.businessType === "moda") {
-              requestTextMsg += "💡 *Exemplo:* Vestido Linho Verde R$ 149,90";
-            } else {
-              requestTextMsg += "💡 *Exemplo:* Bolo de Cenoura R$ 12,00";
-            }
+            requestTextMsg += "Por favor, digite o **Nome do Produto** e o **Preço** para adicionarmos na arte.\n\n";
+            requestTextMsg += "💡 *Exemplo:* Vestido Linho R$ 149,90";
 
             await this.whatsappService.sendText(senderPhone, requestTextMsg, cwCtx);
             return true;
@@ -525,13 +507,8 @@ export class PostFlowService {
 
           if (this.isTriggerMessage(cleanText, true)) {
             let promptMsg = "📸 *Foto do Produto*\n\n";
-            if (session.businessType === "moda") {
-              promptMsg += "Legal! Agora me mande a foto da peça (esticada na mesa, no cabide ou no manequim) com o Nome e Preço na legenda.\n\n";
-              promptMsg += "💡 *Exemplo:* Vestido Linho Verde R$ 149,90\n";
-            } else {
-              promptMsg += "Por favor, envie a *foto do produto* no chat com a legenda contendo o Nome e o Preço.\n\n";
-              promptMsg += "💡 *Exemplo:* Bolo de Cenoura R$ 12,00\n";
-            }
+            promptMsg += "Por favor, envie a *foto do produto* no chat com a legenda contendo o Nome e o Preço.\n\n";
+            promptMsg += "💡 *Exemplo:* Vestido Linho R$ 149,90\n";
             promptMsg += '_(Ou digite *"pular"* se quiser criar o post sem foto)_';
 
             await this.whatsappService.sendText(senderPhone, promptMsg, cwCtx);
@@ -564,8 +541,11 @@ export class PostFlowService {
       confirmMsg += "Identifiquei:\n";
       confirmMsg += `🏷️ *Produto:* ${title}\n`;
       confirmMsg += `💰 *Preço:* ${price}\n`;
-      confirmMsg += `📌 *Tipo de Post:* ${postTypeDisplay}\n\n`;
-      confirmMsg += `Aplicando o template de ${nichoDisplay} e gerando a arte... ⚙️`;
+      confirmMsg += `📌 *Tipo de Post:* ${postTypeDisplay}\n`;
+      if (session.colors) {
+        confirmMsg += `🎨 *Cores:* ${session.colors}\n`;
+      }
+      confirmMsg += `\nAplicando o template de ${nichoDisplay} e gerando a arte... ⚙️`;
 
       await this.whatsappService.sendText(senderPhone, confirmMsg, cwCtx);
 
@@ -761,6 +741,7 @@ export class PostFlowService {
         postType: session?.postType || "produto",
         productImage,
         userProfile,
+        colors: session?.colors,
       });
 
       await this.whatsappService.sendImage(
@@ -776,8 +757,7 @@ export class PostFlowService {
       let finalDeliveryMsg = "Sua arte tá pronta! 🔥\n\n";
       finalDeliveryMsg += "📝 *Sugestão de legenda:*\n\n";
       finalDeliveryMsg += `"Saindo quentinho por aqui! Venha garantir o seu ${productTitle} por apenas ${productPrice}. 😋 #${nichoHashtag} #${sanitizedTitle}"\n\n`;
-      finalDeliveryMsg += "🔄 1. Criar outro post\n";
-      finalDeliveryMsg += "💳 2. Ver meus créditos (2 de 3 testes grátis restantes)";
+      finalDeliveryMsg += "🔄 Digite *'novo post'* para criar outra arte ou altere o nicho com *'alterar nicho'*!";
 
       await this.whatsappService.sendText(senderPhone, finalDeliveryMsg, cwCtx);
 
@@ -786,21 +766,22 @@ export class PostFlowService {
       console.error(`[PostFlowService] Erro ao gerar arte final:`, error);
       await this.whatsappService.sendText(
         senderPhone,
-        "❌ Ocorreu uma falha ao gerar a arte. Por favor, envie '1' para tentar gerar novamente!",
+        "❌ Ocorreu uma falha ao gerar a arte. Por favor, digite 'novo post' para reiniciar o fluxo!",
         cwCtx
       );
     } finally {
-      // Limpa os dados temporários do produto (imagem, título, preço) ao encerrar o fluxo
+      // Limpa os dados temporários e redefine para o início do fluxo de Nicho
       await this.postSessionRepository.createOrUpdate(contactId, {
-        step: PostStep.SELECT_FLOW_MODE,
-        businessType: session?.businessType ?? null,
-        hasHumanModel: session?.hasHumanModel ?? null,
-        modelProfile: session?.modelProfile ?? null,
-        postType: session?.postType ?? "produto",
+        step: PostStep.SELECT_BUSINESS_TYPE,
+        businessType: null,
+        hasHumanModel: null,
+        modelProfile: null,
+        postType: null,
+        templateId: null,
+        colors: null,
         productTitle: null,
         productPrice: null,
         productImage: null,
-        templateId: null,
       });
     }
   }
