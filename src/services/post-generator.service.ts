@@ -85,7 +85,17 @@ function buildExactGeradorPostsPrompt(
   prompt = prompt.replace("{{template_prompt}}", basePrompt);
   prompt = prompt.replace("{{product_name}}", productName);
   prompt = prompt.replace("{{description}}", `Crie e inclua uma pequena descrição comercial curta, persuasiva e atraente para o produto "${productName}".`);
-  prompt = prompt.replace("{{price}}", price);
+  const isWishPost = !price ||
+    price.trim().toLowerCase() === "consulte" ||
+    price.trim().toLowerCase().includes("desejo") ||
+    price.trim().toLowerCase().includes("sem preço") ||
+    price.trim().toLowerCase().includes("sem preco");
+
+  const priceText = isWishPost
+    ? "POST DE DESEJO (SEM PREÇO NUMÉRICO): NUNCA exiba nenhum valor numérico de preço (como R$ 0,00) nem badge/card de preço na imagem. Em vez do preço numérico, inclua uma chamada de desejo discreta, magnética e elegante como 'Peça o Seu', 'Edição Limitada', 'Consulte Disponibilidade' ou 'Peça pelo WhatsApp', ou mantenha o foco puramente no produto e no desejo visual."
+    : price;
+
+  prompt = prompt.replace("{{price}}", priceText);
   prompt = prompt.replace("{{cta}}", "Não fornecido (NÃO inclua nenhum botão de CTA)");
 
   if (colors && colors.trim()) {

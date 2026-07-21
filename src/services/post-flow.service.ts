@@ -554,7 +554,9 @@ export class PostFlowService {
 
         let fastMsg = "⚡ *Modo Post Rápido Ativado!*\n\n";
         fastMsg += "Por favor, me envie agora a *Foto do Produto* e escreva na legenda da foto o **Nome** e o **Preço**.\n\n";
-        fastMsg += "💡 *Exemplo:* Vestido Linho R$ 149,90";
+        fastMsg += "💡 *Dica:* Se NÃO quiser mostrar o preço no post (*Post de Desejo*), digite apenas o Nome do Produto!\n\n";
+        fastMsg += "• *Exemplo com Preço:* Bolo de Cenoura R$ 15,00\n";
+        fastMsg += "• *Exemplo de Desejo:* Bolo de Cenoura";
         await this.whatsappService.sendText(senderPhone, fastMsg, cwCtx);
         return true;
       } else {
@@ -628,7 +630,9 @@ export class PostFlowService {
         imageMsg += "Cores definidas: *Automáticas (IA)* 🎨\n\n";
       }
       imageMsg += "Por favor, me envie agora a *Foto do Produto* e escreva na legenda da foto o **Nome** e o **Preço**.\n\n";
-      imageMsg += "💡 *Exemplo:* Vestido Linho R$ 149,90\n\n";
+      imageMsg += "💡 *Dica:* Se NÃO quiser mostrar o preço no post (*Post de Desejo*), digite apenas o Nome do Produto!\n\n";
+      imageMsg += "• *Exemplo com Preço:* Bolo de Cenoura R$ 15,00\n";
+      imageMsg += "• *Exemplo de Desejo:* Bolo de Cenoura\n\n";
       imageMsg += '_(Se preferir criar a arte do zero sem foto, digite *"pular"*)_';
 
       await this.whatsappService.sendText(senderPhone, imageMsg, cwCtx);
@@ -676,8 +680,8 @@ export class PostFlowService {
         if (!hasCaption) {
           if (isNewImage) {
             let requestTextMsg = "📸 *Foto do Produto Recebida!*\n\n";
-            requestTextMsg += "Por favor, digite o **Nome do Produto** e o **Preço** para adicionarmos na arte.\n\n";
-            requestTextMsg += "💡 *Exemplo:* Vestido Linho R$ 149,90";
+            requestTextMsg += "Por favor, digite o **Nome do Produto** (e o **Preço**, se desejar exibi-lo na arte).\n\n";
+            requestTextMsg += "💡 *Dica:* Para criar um *Post de Desejo* (sem preço), digite apenas o Nome do Produto!";
 
             await this.whatsappService.sendText(senderPhone, requestTextMsg, cwCtx);
             return true;
@@ -685,8 +689,8 @@ export class PostFlowService {
 
           if (this.isTriggerMessage(cleanText, true)) {
             let promptMsg = "📸 *Foto do Produto*\n\n";
-            promptMsg += "Por favor, envie a *foto do produto* no chat com a legenda contendo o Nome e o Preço.\n\n";
-            promptMsg += "💡 *Exemplo:* Vestido Linho R$ 149,90\n";
+            promptMsg += "Por favor, envie a *foto do produto* no chat com a legenda contendo o Nome (e o Preço, se houver).\n\n";
+            promptMsg += "💡 *Dica:* Se NÃO quiser preço no post (*Post de Desejo*), digite apenas o Nome do Produto!\n";
             promptMsg += '_(Ou digite *"pular"* se quiser criar o post sem foto)_';
 
             await this.whatsappService.sendText(senderPhone, promptMsg, cwCtx);
@@ -715,10 +719,16 @@ export class PostFlowService {
         productImage: base64Image,
       });
 
+      const isWish = !price || price === "Consulte" || price.toLowerCase().includes("desejo") || price.toLowerCase().includes("sem preço");
+
       let confirmMsg = "Recebido! 🧀\n\n";
       confirmMsg += "Identifiquei:\n";
       confirmMsg += `🏷️ *Produto:* ${title}\n`;
-      confirmMsg += `💰 *Preço:* ${price}\n`;
+      if (isWish) {
+        confirmMsg += `✨ *Tipo:* Post de Desejo (sem preço numérico)\n`;
+      } else {
+        confirmMsg += `💰 *Preço:* ${price}\n`;
+      }
       confirmMsg += `📌 *Tipo de Post:* ${postTypeDisplay}\n`;
       if (session.colors) {
         confirmMsg += `🎨 *Cores:* ${session.colors}\n`;
@@ -1002,10 +1012,15 @@ export class PostFlowService {
 
       const sanitizedTitle = productTitle.replace(/[^\w\s]/gi, "").replace(/\s+/g, "");
       const nichoHashtag = category.id === "gastronomia" ? "Padaria #Gastronomia" : category.id === "moda" ? "Moda #Fashion" : "Promocao #Varejo";
+      const isWishDelivery = !productPrice || productPrice === "Consulte" || productPrice.toLowerCase().includes("desejo") || productPrice.toLowerCase().includes("sem preço");
 
       let finalDeliveryMsg = "Sua arte tá pronta! 🔥\n\n";
       finalDeliveryMsg += "📝 *Sugestão de legenda:*\n\n";
-      finalDeliveryMsg += `"Saindo quentinho por aqui! Venha garantir o seu ${productTitle} por apenas ${productPrice}. 😋 #${nichoHashtag} #${sanitizedTitle}"\n\n`;
+      if (isWishDelivery) {
+        finalDeliveryMsg += `"Saindo quentinho por aqui! Venha garantir o seu ${productTitle}. Clique no link da bio ou chame no WhatsApp e peça o seu! 😋 #${nichoHashtag} #${sanitizedTitle}"\n\n`;
+      } else {
+        finalDeliveryMsg += `"Saindo quentinho por aqui! Venha garantir o seu ${productTitle} por apenas ${productPrice}. 😋 #${nichoHashtag} #${sanitizedTitle}"\n\n`;
+      }
 
       if (userProfile && typeof userProfile.credits === "number") {
         finalDeliveryMsg += `💳 *Créditos disponíveis:* ${userProfile.credits} post(s)\n\n`;

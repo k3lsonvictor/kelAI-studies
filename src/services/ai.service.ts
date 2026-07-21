@@ -11,28 +11,47 @@ export function parseTitleAndPriceRegex(text: string): { title: string; price: s
     return { title: "Produto Especial", price: "Consulte" };
   }
 
-  const priceWithSuffixRegex = /(?:R\$\s*)?\b\d+(?:[,.]\d{2})?\b(?:\s*(?:\/\s*kg|\/\s*un|\/\s*pct|o\s+kg|o\s+kilo|o\s+quilo|a\s+unidade|unid|un|cada|o\s+pacote|a\s+dúzia|a\s+duzia|no\s+pix|à\s+vista|a\s+vista|no\s+cartão|no\s+cartao|no\s+dinheiro))?/i;
-  let match = clean.match(priceWithSuffixRegex);
+  // Regex para encontrar preços e suas condições/unidades
+  const priceRegex = /(?:R\$\s*)?\b\d+(?:[,.]\d{2})?\b(?:\s*(?:\/\s*kg|\/\s*un|\/\s*pct|o\s+kg|o\s+kilo|o\s+quilo|a\s+unidade|unid|un|cada|o\s+pacote|a\s+dúzia|a\s+duzia|no\s+pix|à\s+vista|a\s+vista|no\s+cartão|no\s+cartao|no\s+dinheiro))?/gi;
 
-  if (!match) {
-    const fallbackRegex = /(?:R\$\s*)?[\d.,]+(?:\s*(?:reais|real))?/i;
-    match = clean.match(fallbackRegex);
-  }
+  const matches = Array.from(clean.matchAll(priceRegex));
 
-  if (match) {
-    const matchedStr = match[0].trim();
-    let title = clean.replace(match[0], "").replace(/[-|:;]/g, "").replace(/\s+/g, " ").trim();
-    if (!title) title = "Produto Especial";
+  if (matches.length > 0) {
+    const formattedPrices: string[] = [];
+    let title = clean;
 
-    const formattedPrice = matchedStr.toLowerCase().startsWith("r$")
-      ? matchedStr.replace(/^r\$\s*/i, "R$ ")
-      : `R$ ${matchedStr}`;
+    for (const match of matches) {
+      const matchedStr = match[0].trim();
+      title = title.replace(match[0], "");
 
-    return { title, price: formattedPrice };
+      const formatted = matchedStr.toLowerCase().startsWith("r$")
+        ? matchedStr.replace(/^r\$\s*/i, "R$ ")
+        : `R$ ${matchedStr}`;
+
+      if (!formattedPrices.includes(formatted)) {
+        formattedPrices.push(formatted);
+      }
+    }
+
+    // Limpa conectivos e caracteres residuais no título (ex: "por", "e", "-", ":")
+    title = title
+      .replace(/\b(?:por|no\s+valor\s+de|e|com|a)\b/gi, "")
+      .replace(/[-|:;,]/g, " ")
+      .replace(/\s+/g, " ")
+      .trim();
+
+    if (!title) {
+      title = "Produto Especial";
+    } else {
+      title = title.charAt(0).toUpperCase() + title.slice(1);
+    }
+
+    const price = formattedPrices.join(" | ");
+    return { title, price };
   }
 
   return {
-    title: clean,
+    title: clean.charAt(0).toUpperCase() + clean.slice(1),
     price: "Consulte",
   };
 }
@@ -81,10 +100,13 @@ export class AIService {
       console.log(`[AIService] Extraindo título e preço via IA para o texto: "${clean}"`);
 
       const prompt = `
-Você é um assistente especialista em e-commerce e redes sociais.
+Você é um assistente especialista em e-commerce, padarias, supermercados e redes sociais.
 Analise a legenda enviada pelo cliente em um chat de WhatsApp e extraia com máxima precisão:
-1. "title": O nome/título exato do produto (ex: "Pão Francês", "Bolo de Cenoura", "Camisa Oversized"). Capitalize de forma elegante.
-2. "price": O valor monetário e eventual unidade/condição de medida (ex: "R$ 10,00 o kg", "R$ 6,50", "R$ 129,90 à vista", "R$ 5,00 a unidade"). Se nenhum preço foi mencionado no texto, retorne "Consulte".
+1. "title": O nome/título exato do produto (ex: "Pão Francês", "Bolo de Cenoura", "Camisa Oversized"). Remova palavras conectivas residuais como "por", "no valor de", "e". Capitalize as palavras de forma elegante.
+2. "price": O valor ou TODOS os valores monetários informados com suas respectivas unidades/condições (ex: se o cliente digitou "pão frances por 18,00 o kg e 0,80 a unidade", retorne "R$ 18,00 o kg | R$ 0,80 a unidade").
+   - Se houver múltiplos preços (ex: por kg e por unidade, atacado e varejo, ou no pix e no cartão), inclua TODOS na mesma string de preço separados por " | ".
+   - Certifique-se de incluir o símbolo "R$" em cada valor numérico se não estiver presente.
+   - Se nenhum preço foi mencionado no texto, retorne "Consulte".
 
 Responda ESTRITAMENTE um objeto JSON válido no formato:
 {"title": "...", "price": "..."}
