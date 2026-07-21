@@ -904,6 +904,15 @@ export class PostFlowService {
           templateId = "quick-offer"; // Clean retail
         }
       }
+
+      // Salva o template ID de fato resolvido no banco para que o "Gerar Novamente" saiba de onde rotacionar
+      await this.updateSession(contactId, cwCtx, {
+        step: session?.step || PostStep.SELECT_FLOW_MODE,
+        templateId: templateId || null,
+      });
+      if (session) {
+        session.templateId = templateId || null;
+      }
     }
 
     const template = getTemplateOrDefault(category, templateId);
