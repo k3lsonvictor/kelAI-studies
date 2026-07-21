@@ -55,6 +55,7 @@ model Message {
 }
 
 enum PostStep {
+  SELECT_FLOW_MODE
   SELECT_BUSINESS_TYPE
   SELECT_TEMPLATE
   INPUT_TITLE

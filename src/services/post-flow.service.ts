@@ -34,39 +34,6 @@ function getNichoDisplayName(businessType?: string | null): string {
   return "Geral/Outro";
 }
 
-/**
- * Mapeia a opção escolhida na Etapa 2 (1 a 4) para o ID do template no nicho selecionado
- */
-function mapOptionToTemplateId(businessType: string, optionInput: string): string {
-  const num = parseInt(optionInput, 10);
-
-  if (businessType === "gastronomia") {
-    if (num === 2) return "retail-bakery-offers";
-    if (num === 3) return "bakery-red-impact";
-    if (num === 4) return "bakery-split-diagonal";
-    return "food-promo"; // 1 ou padrão
-  }
-
-  if (businessType === "moda") {
-    if (num === 2) return "fashion-combo-pinwheel";
-    if (num === 3) return "fashion-botanical-discount";
-    if (num === 4) return "fashion-duo-spotlight-light";
-    return "dark-fashion"; // 1 ou padrão
-  }
-
-  if (businessType === "promocao") {
-    if (num === 2) return "grocery-tabloid-grid";
-    if (num === 3) return "flash-offer-carnivora";
-    if (num === 4) return "retail-impact";
-    return "quick-offer"; // 1 ou padrão
-  }
-
-  // Geral
-  if (num === 2) return "moderno";
-  if (num === 3) return "elegante";
-  return "minimalista";
-}
-
 export class PostFlowService {
   constructor(
     private readonly postSessionRepository: PostSessionRepository,
@@ -76,28 +43,37 @@ export class PostFlowService {
   ) {}
 
   /**
-   * Verifica se a mensagem de entrada é um gatilho para iniciar a criação de um novo post
+   * Verifica se a mensagem de entrada é um gatilho para iniciar ou reiniciar a criação de um post
    */
-  isTriggerMessage(text: string): boolean {
+  isTriggerMessage(text: string, hasActiveSession: boolean): boolean {
     const clean = text.trim().toLowerCase();
-    const triggers = [
-      "olá",
-      "ola",
-      "oi",
+    const explicitTriggers = [
       "novo post",
+      "novo-post",
       "criar post",
       "gerar post",
       "fazer post",
-      "post",
-      "1",
-      "iniciar",
       "menu",
+      "reiniciar",
+      "recomeçar",
+      "recomecar",
     ];
-    return triggers.some((t) => clean === t || clean.startsWith(t));
+
+    if (explicitTriggers.some((t) => clean === t || clean.startsWith(t))) {
+      return true;
+    }
+
+    // Se NÃO houver sessão criada, saudações e comandos iniciais também disparam a primeira interação
+    if (!hasActiveSession) {
+      const initialTriggers = ["olá", "ola", "oi", "iniciar", "1", "post"];
+      return initialTriggers.some((t) => clean === t || clean.startsWith(t));
+    }
+
+    return false;
   }
 
   /**
-   * Orquestra o fluxo interativo em 5 etapas para geração ágil de posts
+   * Orquestra o fluxo duplo (Post Rápido vs Post Personalizado)
    */
   async handlePostFlow(
     contactId: string,
@@ -114,8 +90,10 @@ export class PostFlowService {
 
     // 1. Buscar a sessão ativa para este contato
     let session = await this.postSessionRepository.findByContactId(contactId);
+    const hasSession = Boolean(session);
+    const isTrigger = this.isTriggerMessage(cleanText, hasSession);
 
-    // Tratar comando de cancelamento
+    // Tratar comando de cancelamento a qualquer momento
     if (session && (cleanLower === "cancelar" || cleanLower === "sair" || cleanLower === "parar")) {
       await this.postSessionRepository.deleteByContactId(contactId);
       await this.whatsappService.sendText(
@@ -126,32 +104,84 @@ export class PostFlowService {
       return true;
     }
 
-    // --- ETAPA 1: Boas-vindas e Escolha do Nicho (Apenas quando não houver sessão criada) ---
-    if (!session) {
-      if (!this.isTriggerMessage(cleanText)) {
-        return false; // Não é gatilho, segue para atendimento conversacional padrão
+    // --- GATILHO INICIAL OU COMANDO DE NOVO POST: Apresenta as opções de fluxo ---
+    if (!session || isTrigger) {
+      if (!session && !isTrigger) {
+        return false; // Não é gatilho e não há sessão, segue para atendimento conversacional normal
       }
 
-      // Cria a sessão na Etapa 1: Seleção de Nicho
+      // Reinicia a sessão na etapa SELECT_FLOW_MODE mantendo o nicho salvo se já existir
       session = await this.postSessionRepository.createOrUpdate(contactId, {
-        step: PostStep.SELECT_BUSINESS_TYPE,
+        step: PostStep.SELECT_FLOW_MODE,
+        businessType: session?.businessType ?? null,
+        productTitle: null,
+        productPrice: null,
+        productImage: null,
+        templateId: null,
       });
 
-      let welcomeMsg = "Seja bem-vindo ao PostGen! 🚀\n\n";
-      welcomeMsg += "Vou te ajudar a criar artes profissionais para o seu negócio em segundos.\n\n";
-      welcomeMsg += "Para eu ajustar os modelos para a sua marca, qual é o seu segmento/nicho?\n\n";
-      welcomeMsg += "1️⃣ Padaria / Alimentação / Café\n";
-      welcomeMsg += "2️⃣ Loja de Roupas / Moda\n";
-      welcomeMsg += "3️⃣ Varejo / Mercadinho / Utilidades\n";
-      welcomeMsg += "4️⃣ Outro";
+      let modeMsg = "Como você deseja criar o seu post hoje? 🚀\n\n";
+      modeMsg += "1️⃣ *Post Rápido* (Envie 1 foto com Nome e Preço na legenda e a IA cria a arte na hora!)\n\n";
+      modeMsg += "2️⃣ *Post Personalizado* (Escolha o nicho e selecione o modelo/template visual do post)";
 
-      await this.whatsappService.sendText(senderPhone, welcomeMsg, cwCtx);
+      await this.whatsappService.sendText(senderPhone, modeMsg, cwCtx);
       return true;
     }
 
-    // --- ETAPA 2: Confirmação do Nicho e Escolha do Tipo de Post ---
+    // --- ETAPA: Processar Seleção do Modo de Criação ---
+    if (session.step === PostStep.SELECT_FLOW_MODE) {
+      if (cleanText === "1" || cleanLower.includes("rapido") || cleanLower.includes("rápido")) {
+        // MODO 1: POST RÁPIDO
+        await this.postSessionRepository.createOrUpdate(contactId, {
+          step: PostStep.INPUT_IMAGE,
+          templateId: session.templateId || "food-promo",
+        });
+
+        let fastMsg = "⚡ *Modo Post Rápido Ativado!*\n\n";
+        fastMsg += "Me envie a foto do produto e escreva na legenda da própria foto o Nome e o Preço.\n\n";
+        fastMsg += "💡 *Exemplo:* Bolo de Cenoura R$ 12,00";
+
+        await this.whatsappService.sendText(senderPhone, fastMsg, cwCtx);
+        return true;
+      }
+
+      if (cleanText === "2" || cleanLower.includes("personalizado") || cleanLower.includes("detalhado")) {
+        // MODO 2: POST PERSONALIZADO
+        if (!session.businessType) {
+          // Se o nicho ainda não foi configurado, pede o nicho
+          await this.postSessionRepository.createOrUpdate(contactId, {
+            step: PostStep.SELECT_BUSINESS_TYPE,
+          });
+
+          let welcomeMsg = "🎨 *Modo Post Personalizado*\n\n";
+          welcomeMsg += "Para eu ajustar os modelos para a sua marca, qual é o seu segmento/nicho?\n\n";
+          welcomeMsg += "1️⃣ Padaria / Alimentação / Café\n";
+          welcomeMsg += "2️⃣ Loja de Roupas / Moda\n";
+          welcomeMsg += "3️⃣ Varejo / Mercadinho / Utilidades\n";
+          welcomeMsg += "4️⃣ Outro";
+
+          await this.whatsappService.sendText(senderPhone, welcomeMsg, cwCtx);
+          return true;
+        } else {
+          // Se o nicho já foi configurado, exibe os templates do nicho diretamente
+          await this.postSessionRepository.createOrUpdate(contactId, {
+            step: PostStep.SELECT_TEMPLATE,
+          });
+
+          await this.sendTemplatesMenu(contactId, senderPhone, session.businessType, cwCtx);
+          return true;
+        }
+      }
+
+      // Escolha inválida no menu de modo
+      let retryMsg = "⚠️ *Opção inválida.*\n\nPor favor, digite:\n1️⃣ para *Post Rápido*\n2️⃣ para *Post Personalizado*";
+      await this.whatsappService.sendText(senderPhone, retryMsg, cwCtx);
+      return true;
+    }
+
+    // --- ETAPA: Seleção de Nicho (Post Personalizado - 1º Acesso) ---
     if (session.step === PostStep.SELECT_BUSINESS_TYPE) {
-      let selectedBusinessType = session.businessType || "gastronomia";
+      let selectedBusinessType = "gastronomia";
 
       if (cleanText === "2" || cleanLower.includes("moda") || cleanLower.includes("roupa")) {
         selectedBusinessType = "moda";
@@ -163,43 +193,75 @@ export class PostFlowService {
         selectedBusinessType = "gastronomia";
       }
 
-      const nichoDisplay = getNichoDisplayName(selectedBusinessType);
-
-      // Atualiza sessão com o nicho configurado e avança para SELECT_TEMPLATE
       await this.postSessionRepository.createOrUpdate(contactId, {
         step: PostStep.SELECT_TEMPLATE,
         businessType: selectedBusinessType,
       });
 
-      let postTypeMsg = `Perfeito! Nicho de ${nichoDisplay} configurado! 🥐☕ (Salvo para os próximos posts)\n\n`;
-      postTypeMsg += "O que você quer criar hoje? Digite o número:\n\n";
-      postTypeMsg += "1️⃣ Post de 1 Produto (1 Foto + Nome + Preço)\n";
-      postTypeMsg += "2️⃣ Combo / Lanche (2 Fotos + Preço)\n";
-      postTypeMsg += "3️⃣ Promoção De/Por (1 Foto + Preço Antigo e Novo)\n";
-      postTypeMsg += "4️⃣ Encarte da Semana (3 Produtos + Áudio/Texto)";
-
-      await this.whatsappService.sendText(senderPhone, postTypeMsg, cwCtx);
+      await this.sendTemplatesMenu(contactId, senderPhone, selectedBusinessType, cwCtx);
       return true;
     }
 
-    // --- ETAPA 3: Instrução do Envio (Agilidade) ---
+    // --- ETAPA: Seleção de Template (Post Personalizado) ---
     if (session.step === PostStep.SELECT_TEMPLATE) {
-      const templateId = mapOptionToTemplateId(session.businessType || "gastronomia", cleanText);
+      const category = getCategoryOrDefault(session.businessType);
+      const index = parseInt(cleanText, 10);
+      const defaultTmpl = category.templates[0] || { id: "food-promo", title: "Template Padrão", description: "Design moderno" };
+      const selectedTemplate = category.templates[index - 1] || defaultTmpl;
 
-      // Salva o templateId e avança para aguardar o envio da foto e legenda
       await this.postSessionRepository.createOrUpdate(contactId, {
-        step: PostStep.INPUT_IMAGE,
-        templateId,
+        step: PostStep.INPUT_TITLE,
+        templateId: selectedTemplate.id,
       });
 
-      let instructionMsg = "Show! Me envie a foto do produto e escreva na legenda da própria foto o Nome e o Preço.\n\n";
-      instructionMsg += "💡 *Exemplo:* Bolo de Cenoura R$ 12,00";
+      let titleMsg = "📝 *Título do Produto / Oferta*\n\n";
+      titleMsg += `Template selecionado: *${selectedTemplate.title}*\n\n`;
+      titleMsg += "Por favor, digite o *Título do Produto* que vai aparecer na arte:\n";
+      titleMsg += "_(Exemplo: Hambúrguer Artesanal Duplo ou Camisa Oversized)_";
 
-      await this.whatsappService.sendText(senderPhone, instructionMsg, cwCtx);
+      await this.whatsappService.sendText(senderPhone, titleMsg, cwCtx);
       return true;
     }
 
-    // --- ETAPA 4: Envio pelo Cliente e Processamento ---
+    // --- ETAPA: Digitação do Título (Post Personalizado) ---
+    if (session.step === PostStep.INPUT_TITLE) {
+      if (!cleanText) {
+        await this.whatsappService.sendText(senderPhone, "⚠️ Por favor, digite um título válido para o produto.", cwCtx);
+        return true;
+      }
+
+      await this.postSessionRepository.createOrUpdate(contactId, {
+        step: PostStep.INPUT_PRICE,
+        productTitle: cleanText,
+      });
+
+      let priceMsg = "💰 *Valor do Produto*\n\n";
+      priceMsg += `Produto: *${cleanText}*\n\n`;
+      priceMsg += "Agora, informe o *Valor do Produto* ou a condição da promoção:\n";
+      priceMsg += "_(Exemplo: R$ 49,90 ou Apenas R$ 129,00)_";
+
+      await this.whatsappService.sendText(senderPhone, priceMsg, cwCtx);
+      return true;
+    }
+
+    // --- ETAPA: Digitação do Valor (Post Personalizado) ---
+    if (session.step === PostStep.INPUT_PRICE) {
+      await this.postSessionRepository.createOrUpdate(contactId, {
+        step: PostStep.INPUT_IMAGE,
+        productPrice: cleanText,
+      });
+
+      let imageMsg = "📸 *Foto do Produto*\n\n";
+      imageMsg += `Produto: *${session.productTitle}*\n`;
+      imageMsg += `Valor: *${cleanText}*\n\n`;
+      imageMsg += "Envie agora a *Foto do Produto* aqui no chat! 📷\n\n";
+      imageMsg += '_(Se preferir que a IA crie a arte do zero sem foto, digite *"pular"*)_';
+
+      await this.whatsappService.sendText(senderPhone, imageMsg, cwCtx);
+      return true;
+    }
+
+    // --- ETAPA: Envio da Foto e Processamento (Post Rápido ou Personalizado) ---
     if (session.step === PostStep.INPUT_IMAGE) {
       let base64Image: string | null = session.productImage || null;
       let rawCaption = (incomingMsg.caption || incomingMsg.body || "").trim();
@@ -219,7 +281,6 @@ export class PostFlowService {
           console.error(`[PostFlowService] Erro ao baixar foto do produto:`, error.message || error);
         }
 
-        // Salva a imagem na sessão para ser usada se o usuário mandar o título/preço na mensagem seguinte
         if (base64Image) {
           await this.postSessionRepository.createOrUpdate(contactId, {
             step: PostStep.INPUT_IMAGE,
@@ -232,43 +293,48 @@ export class PostFlowService {
         base64Image = null;
       }
 
-      // Verificar se a mensagem possui uma legenda ou texto descritivo real
-      const hasCaption = rawCaption.length > 0 && rawCaption !== "[Imagem]";
+      // Se já possui título e preço definidos pelo fluxo Personalizado
+      let title = session.productTitle;
+      let price = session.productPrice;
 
-      // Caso o usuário tenha enviado a FOTO sem legenda
-      if (!hasCaption) {
-        if (isNewImage) {
-          let requestTextMsg = "📸 *Foto do Produto Recebida!*\n\n";
-          requestTextMsg += "Para garantirmos uma arte incrível e sem erros, por favor digite o **Nome do Produto** e o **Preço**.\n\n";
-          requestTextMsg += "💡 *Exemplo:* Bolo de Cenoura R$ 12,00";
+      // Se NÃO possui título e preço (Post Rápido), extrai da legenda via IA
+      if (!title || !price) {
+        const hasCaption = rawCaption.length > 0 && rawCaption !== "[Imagem]";
 
-          await this.whatsappService.sendText(senderPhone, requestTextMsg, cwCtx);
-          return true;
+        if (!hasCaption) {
+          if (isNewImage) {
+            let requestTextMsg = "📸 *Foto do Produto Recebida!*\n\n";
+            requestTextMsg += "Para garantirmos uma arte incrível e sem erros, por favor digite o **Nome do Produto** e o **Preço**.\n\n";
+            requestTextMsg += "💡 *Exemplo:* Bolo de Cenoura R$ 12,00";
+
+            await this.whatsappService.sendText(senderPhone, requestTextMsg, cwCtx);
+            return true;
+          }
+
+          if (this.isTriggerMessage(cleanText, true)) {
+            let promptMsg = "📸 *Foto do Produto*\n\n";
+            promptMsg += "Por favor, envie a *foto do produto* no chat com a legenda contendo o Nome e o Preço.\n\n";
+            promptMsg += "💡 *Exemplo:* Bolo de Cenoura R$ 12,00\n";
+            promptMsg += '_(Ou digite *"pular"* se quiser criar o post sem foto)_';
+
+            await this.whatsappService.sendText(senderPhone, promptMsg, cwCtx);
+            return true;
+          }
         }
 
-        if (this.isTriggerMessage(cleanText)) {
-          let promptMsg = "📸 *Foto do Produto*\n\n";
-          promptMsg += "Por favor, envie a *foto do produto* no chat com a legenda contendo o Nome e o Preço.\n\n";
-          promptMsg += "💡 *Exemplo:* Bolo de Cenoura R$ 12,00\n";
-          promptMsg += '_(Ou digite *"pular"* se quiser criar o post sem foto)_';
-
-          await this.whatsappService.sendText(senderPhone, promptMsg, cwCtx);
-          return true;
+        let extractedData: { title: string; price: string };
+        if (this.aiService) {
+          extractedData = await this.aiService.extractTitleAndPrice(rawCaption);
+        } else {
+          extractedData = parseTitleAndPriceRegex(rawCaption);
         }
+
+        title = extractedData.title;
+        price = extractedData.price;
       }
 
-      // Extrai Nome e Preço da legenda enviada na foto ou no texto seguinte
-      let extractedData: { title: string; price: string };
-      if (this.aiService) {
-        extractedData = await this.aiService.extractTitleAndPrice(rawCaption);
-      } else {
-        extractedData = parseTitleAndPriceRegex(rawCaption);
-      }
-
-      const { title, price } = extractedData;
       const nichoDisplay = getNichoDisplayName(session.businessType);
 
-      // Salva dados e avança para a geração da arte
       await this.postSessionRepository.createOrUpdate(contactId, {
         step: PostStep.GENERATING,
         productTitle: title,
@@ -284,12 +350,10 @@ export class PostFlowService {
 
       await this.whatsappService.sendText(senderPhone, confirmMsg, cwCtx);
 
-      // Dispara a geração da imagem e a entrega final
       await this.generatePostAndSend(contactId, senderPhone, userProfile, cwCtx);
       return true;
     }
 
-    // Se a sessão estiver em estado GENERATING e o usuário enviar uma nova mensagem
     if (session.step === PostStep.GENERATING) {
       await this.whatsappService.sendText(
         senderPhone,
@@ -300,6 +364,56 @@ export class PostFlowService {
     }
 
     return false;
+  }
+
+  /**
+   * Envia a imagem do guia visual e o menu de templates do nicho
+   */
+  private async sendTemplatesMenu(
+    contactId: string,
+    senderPhone: string,
+    businessType?: string | null,
+    cwCtx?: { accountId?: number | string; conversationId?: number | string }
+  ): Promise<void> {
+    const category = getCategoryOrDefault(businessType);
+
+    try {
+      const categoryFileMap: Record<string, string> = {
+        gastronomia: "templates-comida.png",
+        promocao: "templates-varejo.png",
+        varejo: "templates-varejo.png",
+        moda: "templates-moda.png",
+      };
+
+      const targetFileName = categoryFileMap[category.id] || `templates-${category.id}.png`;
+      const assetPath = path.resolve(process.cwd(), "assets", targetFileName);
+      const fallbackPath = path.resolve(process.cwd(), "assets", "templates-moda.png");
+      const finalPath = fs.existsSync(assetPath) ? assetPath : (fs.existsSync(fallbackPath) ? fallbackPath : null);
+
+      if (finalPath) {
+        const imgBuffer = fs.readFileSync(finalPath);
+        const base64Url = `data:image/png;base64,${imgBuffer.toString("base64")}`;
+        await this.whatsappService.sendImage(
+          senderPhone,
+          base64Url,
+          `🖼️ *Guia Visual dos Templates de ${category.name}*`,
+          cwCtx
+        );
+      }
+    } catch (assetErr: any) {
+      console.warn(`[PostFlowService] Falha ao enviar imagem do guia visual: ${assetErr.message}`);
+    }
+
+    let templateMenu = `✨ *Templates para ${category.name}* ✨\n\n`;
+    templateMenu += "Escolha o estilo do template para sua arte:\n\n";
+
+    category.templates.forEach((tmpl, index) => {
+      templateMenu += `*${index + 1}* - *${tmpl.title}*\n   _${tmpl.description}_\n\n`;
+    });
+
+    templateMenu += "*(Digite o número do template escolhido)*";
+
+    await this.whatsappService.sendText(senderPhone, templateMenu, cwCtx);
   }
 
   /**
@@ -331,7 +445,6 @@ export class PostFlowService {
         userProfile,
       });
 
-      // 1. Enviar a imagem do post pronta via WhatsApp / Chatwoot
       await this.whatsappService.sendImage(
         senderPhone,
         result.imageUrl,
@@ -339,7 +452,6 @@ export class PostFlowService {
         cwCtx
       );
 
-      // 2. Enviar a sugestão de legenda para o Instagram + Opções de retenção (Etapa 5)
       const sanitizedTitle = productTitle.replace(/[^\w\s]/gi, "").replace(/\s+/g, "");
       const nichoHashtag = category.id === "gastronomia" ? "Padaria #Gastronomia" : category.id === "moda" ? "Moda #Fashion" : "Promocao #Varejo";
 
@@ -360,9 +472,8 @@ export class PostFlowService {
         cwCtx
       );
     } finally {
-      // Manter o nicho salvo na sessão do contato e redefinir o passo para a Etapa 2
       await this.postSessionRepository.createOrUpdate(contactId, {
-        step: PostStep.SELECT_TEMPLATE,
+        step: PostStep.SELECT_FLOW_MODE,
         businessType: session?.businessType ?? null,
       });
     }
