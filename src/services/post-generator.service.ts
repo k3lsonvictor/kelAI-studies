@@ -66,6 +66,7 @@ REGRAS OBRIGATÓRIAS
 • O produto deve permanecer exatamente igual ao original.
 • O produto é sempre o protagonista absoluto.
 • NUNCA invente novos produtos.
+• NUNCA desenhe, invente, simule ou adicione textos fictícios como "sua logo aqui", "sua marca", "logo", "logo da empresa", ou crie logotipos fictícios/ícones na imagem se o Logotipo da Marca for "Não fornecido". Se o Logotipo da Marca for "Não fornecido", a imagem deve ficar 100% livre e limpa de qualquer logotipo ou marca d'água corporativa fictícia.
 • Insira o contato do Instagram ({{instagram_profile}}) e o WhatsApp/Telefone de contato ({{contact_number}}) de forma elegante, discreta e minimalista nas margens ou rodapé da arte, preferencialmente acompanhados de ícones correspondentes.
 `;
 
@@ -101,9 +102,13 @@ function buildExactGeradorPostsPrompt(
     ? `Inclua o perfil do Instagram '${userProfile.instagramProfile.trim()}' no post.`
     : "NÃO inclua nenhum perfil ou arroba do Instagram na imagem do post, pois o usuário não possui Instagram cadastrado. Deixe a arte totalmente sem arroba ou ícone do Instagram.";
 
+  const logoText = (userProfile?.logoUrl && userProfile.logoUrl.trim() && userProfile.logoUrl !== "Não fornecido")
+    ? `Utilize esta imagem como o logotipo oficial da marca: ${userProfile.logoUrl.trim()}`
+    : "NÃO invente, simule ou desenhe nenhum logotipo na imagem. É proibido criar logotipos fictícios ou adicionar textos de substituição de marca (como 'sua logo', 'logo da empresa'). Se o logotipo não estiver fornecido, deixe a imagem totalmente sem logotipo.";
+
   prompt = prompt.replace("{{contact_number}}", contactText);
   prompt = prompt.replace("{{instagram_profile}}", instagramText);
-  prompt = prompt.replace("{{logo_url}}", userProfile?.logoUrl || "Não fornecido");
+  prompt = prompt.replace("{{logo_url}}", logoText);
   return prompt;
 }
 
