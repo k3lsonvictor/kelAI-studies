@@ -244,8 +244,18 @@ export function findTemplateByIndexOrId(
     return category.templates[index];
   }
   const cleanInput = input.trim().toLowerCase();
+  
+  // 1. Busca por ID exato
+  const exactById = category.templates.find((t) => t.id.toLowerCase() === cleanInput);
+  if (exactById) return exactById;
+
+  // 2. Busca por título exato
+  const exactByTitle = category.templates.find((t) => t.title.toLowerCase() === cleanInput);
+  if (exactByTitle) return exactByTitle;
+
+  // 3. Fallback de correspondência parcial
   return category.templates.find(
-    (t) => t.id.toLowerCase() === cleanInput || t.title.toLowerCase().includes(cleanInput)
+    (t) => t.title.toLowerCase().includes(cleanInput)
   );
 }
 
