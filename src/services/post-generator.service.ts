@@ -102,13 +102,13 @@ function buildExactGeradorPostsPrompt(
   if (hasHumanModel) {
     const genderStr = humanModelGender === "man" ? "masculino (homem adulto)" : humanModelGender === "kids" ? "infantil (criança / modelo infantil)" : "feminino (mulher adulta)";
     humanModelPrompt = `
-Adicione um modelo humano ${genderStr} interagindo de forma natural e profissional com o produto (por exemplo, segurando, usando ou vestindo a peça de roupa).
+• EXIGÊNCIA OBRIGATÓRIA DE MODELO: A imagem gerada DEVE OBRIGATORIAMENTE conter um modelo humano ${genderStr} VESTINDO e apresentando a peça de roupa / produto principal na composição.
 
-Se o produto for uma peça de vestuário apresentada em um manequim, cabide ou mesa (como camisetas, vestidos, calças, moletons, jaquetas ou roupas em geral), substitua a peça solta por um modelo humano ${genderStr} vestindo exatamente a mesma peça. Preserve fielmente o design da roupa, incluindo cores, estampas, logotipos, modelagem e todos os detalhes originais, sem realizar qualquer alteração.
+• Se a imagem de entrada mostrar a roupa em um manequim, cabide, mesa ou produto isolado, VOCÊ DEVE SUBSTITTUIR essa apresentação e colocar a peça de roupa VESTIDA por um(a) modelo humano(a) real ${genderStr}. Preserve fielmente o design da roupa, incluindo cores, estampas, tecidos, modelagem e todos os detalhes originais. NUNCA gere a imagem final com o produto isolado ou em manequim quando esta regra estiver ativa.
 
-O modelo deve parecer estar usando a roupa de forma natural, como em um ensaio fotográfico profissional para catálogo de moda ou redes sociais.
+• O(A) modelo deve estar vestindo a peça de forma natural, realista e elegante, como em um ensaio fotográfico profissional para catálogo de moda ou redes sociais.
 
-Garanta que o produto principal continue em destaque absoluto e não seja modificado, ocultado ou obstruído.
+• Garanta que o produto principal continue em destaque absoluto e não seja modificado, ocultado ou obstruído.
 `;
   } else {
     humanModelPrompt = "Não adicione nenhum modelo humano (pessoas, homens ou mulheres) na imagem. O foco visual deve ser puramente no produto.";

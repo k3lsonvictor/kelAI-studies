@@ -20,7 +20,7 @@ export const BUSINESS_CATEGORIES: BusinessCategoryConfig[] = [
         id: "dark-fashion",
         title: "Dark Fashion",
         description: "Cinematográfico, sofisticado e premium com tons escuros",
-        basePrompt: "Crie um post comercial inspirado em campanhas premium de moda masculina e urbana. Iluminação cinematográfica, fundos escuros, pretos e grafites sofisticados. Tipografia grande e marcante.",
+        basePrompt: "Crie um post comercial inspirado em campanhas premium de moda e alta costura. Iluminação cinematográfica, fundos escuros, pretos e grafites sofisticados. Tipografia grande e marcante.",
       },
       {
         id: "streetwear",
