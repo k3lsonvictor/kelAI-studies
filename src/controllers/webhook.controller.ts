@@ -291,7 +291,7 @@ export async function toggleChatwootTyping(
   if (!chatwootUrl || !chatwootToken) return;
 
   try {
-    const res = await fetch(`${chatwootUrl}/api/v1/accounts/${accountId}/conversations/${conversationId}/toggle_typing`, {
+    const res = await fetch(`${chatwootUrl}/api/v1/accounts/${accountId}/conversations/${conversationId}/toggle_typing_status`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
