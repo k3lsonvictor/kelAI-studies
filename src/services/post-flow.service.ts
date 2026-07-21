@@ -270,18 +270,29 @@ export class PostFlowService {
       }
     }
 
-    // --- PASSO 1: Escolha do Nicho ➔ IA pergunta se é Rápido ou Personalizado ---
+    // --- PASSO 1: Escolha do Nicho ➔ Validação estrita dos botões de Nicho ---
     if (session.step === PostStep.SELECT_BUSINESS_TYPE) {
-      let selectedBusinessType = "gastronomia";
+      const isOption1 = cleanText === "1" || cleanLower.includes("padaria") || cleanLower.includes("alimentação") || cleanLower.includes("alimentacao") || cleanLower.includes("café") || cleanLower.includes("cafe");
+      const isOption2 = cleanText === "2" || cleanLower.includes("moda") || cleanLower.includes("roupa");
+      const isOption3 = cleanText === "3" || cleanLower.includes("varejo") || cleanLower.includes("mercadinho") || cleanLower.includes("mercado");
+      const isOption4 = cleanText === "4" || cleanLower.includes("outro");
 
-      if (cleanText === "2" || cleanLower.includes("moda") || cleanLower.includes("roupa")) {
+      if (!isOption1 && !isOption2 && !isOption3 && !isOption4) {
+        await this.sendBusinessTypePrompt(
+          senderPhone,
+          "⚠️ Opção inválida. Por favor, selecione um dos nichos da lista abaixo:",
+          cwCtx
+        );
+        return true;
+      }
+
+      let selectedBusinessType = "gastronomia";
+      if (isOption2) {
         selectedBusinessType = "moda";
-      } else if (cleanText === "3" || cleanLower.includes("varejo") || cleanLower.includes("mercadinho") || cleanLower.includes("mercado")) {
+      } else if (isOption3) {
         selectedBusinessType = "promocao";
-      } else if (cleanText === "4" || cleanLower.includes("outro")) {
+      } else if (isOption4) {
         selectedBusinessType = "geral";
-      } else {
-        selectedBusinessType = "gastronomia";
       }
 
       session = await this.updateSession(contactId, cwCtx, {
@@ -293,7 +304,7 @@ export class PostFlowService {
       return true;
     }
 
-    // --- PASSO 2: Escolha do Modo (Rápido vs Personalizado) ➔ Se Moda, pergunta Modelo/Foto; se não, pergunta postType ---
+    // --- PASSO 2: Escolha do Modo (Rápido vs Personalizado) ➔ Validação estrita ---
     if (session.step === PostStep.SELECT_FLOW_MODE) {
       const isQuick = cleanText === "1" || cleanLower.includes("rapido") || cleanLower.includes("rápido");
       const isCustom = cleanText === "2" || cleanLower.includes("personalizado") || cleanLower.includes("detalhado");
@@ -338,10 +349,16 @@ export class PostFlowService {
       return true;
     }
 
-    // --- PASSO ADICIONAL MODA 1: Foto Real vs Modelo Virtual ---
+    // --- PASSO ADICIONAL MODA 1: Foto Real vs Modelo Virtual ➔ Validação estrita ---
     if (session.step === PostStep.SELECT_FASHION_PRESENTATION) {
+      const isRealPhoto = cleanText === "1" || cleanLower.includes("foto") || cleanLower.includes("real");
       const isVirtualModel = cleanText === "2" || cleanLower.includes("modelo") || cleanLower.includes("virtual") || cleanLower.includes("ia");
       const isQuick = session.templateId === "quick";
+
+      if (!isRealPhoto && !isVirtualModel) {
+        await this.sendFashionPresentationPrompt(senderPhone, cwCtx);
+        return true;
+      }
 
       if (isVirtualModel) {
         session = await this.updateSession(contactId, cwCtx, {
@@ -374,13 +391,21 @@ export class PostFlowService {
       }
     }
 
-    // --- PASSO ADICIONAL MODA 2: Escolha do Modelo Virtual ---
+    // --- PASSO ADICIONAL MODA 2: Escolha do Modelo Virtual ➔ Validação estrita ---
     if (session.step === PostStep.SELECT_FASHION_MODEL) {
-      let selectedModelProfile = "woman";
+      const isWoman = cleanText === "1" || cleanLower.includes("mulher") || cleanLower.includes("feminino");
+      const isMan = cleanText === "2" || cleanLower.includes("homem") || cleanLower.includes("masculino");
+      const isKids = cleanText === "3" || cleanLower.includes("crianca") || cleanLower.includes("criança") || cleanLower.includes("infantil") || cleanLower.includes("kids");
 
-      if (cleanText === "2" || cleanLower.includes("homem") || cleanLower.includes("masculino")) {
+      if (!isWoman && !isMan && !isKids) {
+        await this.sendFashionModelPrompt(senderPhone, cwCtx);
+        return true;
+      }
+
+      let selectedModelProfile = "woman";
+      if (isMan) {
         selectedModelProfile = "man";
-      } else if (cleanText === "3" || cleanLower.includes("crianca") || cleanLower.includes("criança") || cleanLower.includes("infantil") || cleanLower.includes("kids")) {
+      } else if (isKids) {
         selectedModelProfile = "kids";
       }
 
@@ -407,19 +432,40 @@ export class PostFlowService {
       return true;
     }
 
-    // --- PASSO 3: Seleção do Tipo de Post (Quantidade de Produtos / Formato) ---
+    // --- PASSO 3: Seleção do Tipo de Post (Quantidade de Produtos / Formato) ➔ Validação estrita ---
     if (session.step === PostStep.SELECT_POST_TYPE) {
-      let selectedPostType = "produto";
-
-      if (cleanText === "2" || cleanLower.includes("combo") || cleanLower.includes("kit")) {
-        selectedPostType = "combo";
-      } else if (cleanText === "3" || cleanLower.includes("promo") || cleanLower.includes("oferta")) {
-        selectedPostType = "promocao";
-      } else if (cleanText === "4" || cleanLower.includes("encarte") || cleanLower.includes("tabela") || cleanLower.includes("lista")) {
-        selectedPostType = "encarte";
-      }
+      const isType1 = cleanText === "1" || cleanLower.includes("único") || cleanLower.includes("unico") || cleanLower.includes("produto");
+      const isType2 = cleanText === "2" || cleanLower.includes("combo") || cleanLower.includes("kit");
+      const isType3 = cleanText === "3" || cleanLower.includes("promo") || cleanLower.includes("oferta");
+      const isType4 = cleanText === "4" || cleanLower.includes("encarte") || cleanLower.includes("tabela") || cleanLower.includes("lista");
 
       const isQuick = session.templateId === "quick";
+
+      if (!isType1 && !isType2 && !isType3 && !isType4) {
+        if (isQuick) {
+          await this.sendPostTypePrompt(
+            senderPhone,
+            "⚠️ Opção inválida. Pra quantos produtos é o seu post hoje?",
+            cwCtx
+          );
+        } else {
+          await this.sendPostTypePrompt(
+            senderPhone,
+            "⚠️ Opção inválida. Como deseja apresentar o seu produto ou oferta?",
+            cwCtx
+          );
+        }
+        return true;
+      }
+
+      let selectedPostType = "produto";
+      if (isType2) {
+        selectedPostType = "combo";
+      } else if (isType3) {
+        selectedPostType = "promocao";
+      } else if (isType4) {
+        selectedPostType = "encarte";
+      }
 
       if (isQuick) {
         session = await this.updateSession(contactId, cwCtx, {
@@ -449,12 +495,25 @@ export class PostFlowService {
       }
     }
 
-    // --- PASSO 4 (Custom): Seleção de Template ➔ Pergunta quais as cores principais ---
+    // --- PASSO 4 (Custom): Seleção de Template ➔ Validação estrita ---
     if (session.step === PostStep.SELECT_TEMPLATE) {
       const category = getCategoryOrDefault(session.businessType);
       const index = parseInt(cleanText, 10);
-      const defaultTmpl = category.templates[0] || { id: "food-promo", title: "Template Padrão", description: "Design moderno" };
-      const selectedTemplate = category.templates[index - 1] || defaultTmpl;
+
+      if (isNaN(index) || index < 1 || index > category.templates.length) {
+        await this.whatsappService.sendText(
+          senderPhone,
+          `⚠️ Opção inválida. Por favor, escolha um número de template válido (de 1 a ${category.templates.length}).`,
+          cwCtx
+        );
+        await this.sendTemplatesMenu(contactId, senderPhone, session.businessType, cwCtx);
+        return true;
+      }
+
+      const selectedTemplate = category.templates[index - 1];
+      if (!selectedTemplate) {
+        return true;
+      }
 
       session = await this.updateSession(contactId, cwCtx, {
         step: PostStep.INPUT_COLORS,
@@ -760,10 +819,43 @@ export class PostFlowService {
     const session = await this.postSessionRepository.findByContactId(contactId);
 
     const category = getCategoryOrDefault(session?.businessType);
-    const template = getTemplateOrDefault(category, session?.templateId);
+    let templateId = session?.templateId;
     const productTitle = session?.productTitle || "Vestido Linho Verde";
     const productPrice = session?.productPrice || "R$ 149,90";
     const productImage = session?.productImage || null;
+
+    // Se for Post Rápido (usando placeholder "food-promo" ou sem template definido), escolhe o melhor template dinamicamente
+    if (templateId === "food-promo" || !templateId) {
+      if (category.id === "moda") {
+        const titleLower = productTitle.toLowerCase();
+        
+        if (session?.modelProfile === "kids" || titleLower.includes("infantil") || titleLower.includes("criança") || titleLower.includes("bebê") || titleLower.includes("kids")) {
+          templateId = "kids";
+        } else if (titleLower.includes("florido") || titleLower.includes("vestido") || titleLower.includes("saia") || titleLower.includes("estampado") || titleLower.includes("leve") || titleLower.includes("linho") || titleLower.includes("seda") || titleLower.includes("floral") || titleLower.includes("colorido")) {
+          templateId = "luxury-single-oval-light"; // Light, elegant off-white/creme
+        } else if (titleLower.includes("streetwear") || titleLower.includes("moletom") || titleLower.includes("jaqueta") || titleLower.includes("tênis") || titleLower.includes("tenis") || titleLower.includes("boné") || titleLower.includes("bone")) {
+          templateId = "streetwear"; // Streetwear style
+        } else {
+          templateId = "fashion"; // Zara minimal, light/clean fashion template
+        }
+      } else if (category.id === "gastronomia") {
+        const titleLower = productTitle.toLowerCase();
+        if (titleLower.includes("pão") || titleLower.includes("pao") || titleLower.includes("artesanal") || titleLower.includes("doce") || titleLower.includes("bolo")) {
+          templateId = "bakery-spotlight"; // Acolhedor/rústico/madeira
+        } else {
+          templateId = "food-promo"; // Escuro texturizado/apetitoso
+        }
+      } else if (category.id === "promocao" || category.id === "varejo") {
+        const titleLower = productTitle.toLowerCase();
+        if (titleLower.includes("horta") || titleLower.includes("fruta") || titleLower.includes("verdura") || titleLower.includes("feirinha") || titleLower.includes("alface") || titleLower.includes("legume")) {
+          templateId = "grocery-color-block-spotlight"; // Hortifruti color block
+        } else {
+          templateId = "quick-offer"; // Clean retail
+        }
+      }
+    }
+
+    const template = getTemplateOrDefault(category, templateId);
 
     if (!userProfile && this.supabaseProfileService) {
       const auth = await this.supabaseProfileService.getProfileByPhone(senderPhone);
