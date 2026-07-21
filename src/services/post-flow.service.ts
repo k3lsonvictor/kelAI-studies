@@ -958,6 +958,16 @@ export class PostFlowService {
         cwCtx
       );
 
+      // Deduz o crédito do usuário após a geração de sucesso
+      if (userProfile?.id && typeof userProfile.credits === "number" && this.supabaseProfileService) {
+        try {
+          const newCredits = await this.supabaseProfileService.deductCredit(userProfile.id, userProfile.credits);
+          userProfile.credits = newCredits;
+        } catch (creditErr) {
+          console.error(`[PostFlowService] Erro ao deduzir crédito para o usuário ${senderPhone}:`, creditErr);
+        }
+      }
+
       // Delay de 3.5 segundos para garantir que a imagem seja entregue/renderizada antes do texto no celular do usuário
       await new Promise((resolve) => setTimeout(resolve, 3500));
 

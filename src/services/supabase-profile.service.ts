@@ -105,4 +105,28 @@ export class SupabaseProfileService {
       return { isAuthorized: false, profile: null };
     }
   }
+
+  /**
+   * Deduz 1 crédito do perfil de um usuário no Supabase baseado no seu ID de perfil.
+   */
+  async deductCredit(profileId: string, currentCredits: number): Promise<number> {
+    const finalCredits = Math.max(0, currentCredits - 1);
+    try {
+      console.log(`[SupabaseProfileService] Deduzindo 1 crédito do perfil ID ${profileId}. Saldo anterior: ${currentCredits} | Novo saldo: ${finalCredits}`);
+      
+      const { error } = await this.client
+        .from("profiles")
+        .update({ credits: finalCredits })
+        .eq("id", profileId);
+
+      if (error) {
+        throw error;
+      }
+
+      return finalCredits;
+    } catch (err: any) {
+      console.error(`[SupabaseProfileService] Falha ao deduzir crédito para ID ${profileId}:`, err.message || err);
+      return currentCredits;
+    }
+  }
 }
