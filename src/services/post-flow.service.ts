@@ -57,6 +57,23 @@ export class PostFlowService {
   ) {}
 
   /**
+   * Wrapper privado para atualizar a sessão incluindo e persistindo o contexto do Chatwoot
+   */
+  private async updateSession(
+    contactId: string,
+    cwCtx: { accountId?: number | string; conversationId?: number | string } | undefined,
+    data: Parameters<PostSessionRepository["createOrUpdate"]>[1]
+  ) {
+    const chatwootAccountId = cwCtx?.accountId ? String(cwCtx.accountId) : undefined;
+    const chatwootConversationId = cwCtx?.conversationId ? String(cwCtx.conversationId) : undefined;
+    return this.postSessionRepository.createOrUpdate(contactId, {
+      ...data,
+      ...(chatwootAccountId !== undefined && { chatwootAccountId }),
+      ...(chatwootConversationId !== undefined && { chatwootConversationId }),
+    });
+  }
+
+  /**
    * Verifica se a mensagem é um comando para encerrar ou cancelar o fluxo de post
    */
   isCancellationCommand(text: string): boolean {
@@ -72,6 +89,8 @@ export class PostFlowService {
       "parar fluxo",
       "encerrar fluxo",
       "cancelar fluxo",
+      "agora nao",
+      "agora não",
     ];
     return cancelWords.some((word) => clean === word || clean.startsWith(word));
   }
@@ -164,7 +183,7 @@ export class PostFlowService {
     // --- COMANDO DE CANCELAMENTO OU ENCERRAMENTO ---
     if (session && this.isCancellationCommand(cleanText)) {
       // Em vez de deletar para não perder o nicho salvo, apenas reiniciamos a sessão preservando o nicho
-      await this.postSessionRepository.createOrUpdate(contactId, {
+      await this.updateSession(contactId, cwCtx, {
         step: PostStep.SELECT_FLOW_MODE,
         postType: null,
         templateId: null,
@@ -184,7 +203,7 @@ export class PostFlowService {
 
     // --- COMANDO DE ALTERAR NICHO (Limpa o nicho salvo e reinicia) ---
     if (this.isNichoChangeCommand(cleanText)) {
-      session = await this.postSessionRepository.createOrUpdate(contactId, {
+      session = await this.updateSession(contactId, cwCtx, {
         step: PostStep.SELECT_BUSINESS_TYPE,
         businessType: null,
         hasHumanModel: null,
@@ -215,7 +234,7 @@ export class PostFlowService {
 
       if (hasSavedNicho) {
         // Nicho já está salvo, pula direto para a escolha do Modo (Rápido vs Personalizado)
-        session = await this.postSessionRepository.createOrUpdate(contactId, {
+        session = await this.updateSession(contactId, cwCtx, {
           step: PostStep.SELECT_FLOW_MODE,
           postType: null,
           templateId: null,
@@ -229,7 +248,7 @@ export class PostFlowService {
         return true;
       } else {
         // Primeira vez: precisa perguntar o Nicho
-        session = await this.postSessionRepository.createOrUpdate(contactId, {
+        session = await this.updateSession(contactId, cwCtx, {
           step: PostStep.SELECT_BUSINESS_TYPE,
           businessType: null,
           hasHumanModel: null,
@@ -265,7 +284,7 @@ export class PostFlowService {
         selectedBusinessType = "gastronomia";
       }
 
-      session = await this.postSessionRepository.createOrUpdate(contactId, {
+      session = await this.updateSession(contactId, cwCtx, {
         step: PostStep.SELECT_FLOW_MODE,
         businessType: selectedBusinessType,
       });
@@ -286,20 +305,20 @@ export class PostFlowService {
 
       const modeStr = isQuick ? "quick" : "custom";
 
-      session = await this.postSessionRepository.createOrUpdate(contactId, {
+      session = await this.updateSession(contactId, cwCtx, {
         step: PostStep.SELECT_FLOW_MODE,
         templateId: modeStr,
       });
 
       if (session.businessType === "moda") {
-        session = await this.postSessionRepository.createOrUpdate(contactId, {
+        session = await this.updateSession(contactId, cwCtx, {
           step: PostStep.SELECT_FASHION_PRESENTATION,
         });
         await this.sendFashionPresentationPrompt(senderPhone, cwCtx);
         return true;
       }
 
-      session = await this.postSessionRepository.createOrUpdate(contactId, {
+      session = await this.updateSession(contactId, cwCtx, {
         step: PostStep.SELECT_POST_TYPE,
       });
 
@@ -325,14 +344,14 @@ export class PostFlowService {
       const isQuick = session.templateId === "quick";
 
       if (isVirtualModel) {
-        session = await this.postSessionRepository.createOrUpdate(contactId, {
+        session = await this.updateSession(contactId, cwCtx, {
           step: PostStep.SELECT_FASHION_MODEL,
           hasHumanModel: true,
         });
         await this.sendFashionModelPrompt(senderPhone, cwCtx);
         return true;
       } else {
-        session = await this.postSessionRepository.createOrUpdate(contactId, {
+        session = await this.updateSession(contactId, cwCtx, {
           step: PostStep.SELECT_POST_TYPE,
           hasHumanModel: false,
           modelProfile: null,
@@ -365,7 +384,7 @@ export class PostFlowService {
         selectedModelProfile = "kids";
       }
 
-      session = await this.postSessionRepository.createOrUpdate(contactId, {
+      session = await this.updateSession(contactId, cwCtx, {
         step: PostStep.SELECT_POST_TYPE,
         modelProfile: selectedModelProfile,
       });
@@ -403,7 +422,7 @@ export class PostFlowService {
       const isQuick = session.templateId === "quick";
 
       if (isQuick) {
-        session = await this.postSessionRepository.createOrUpdate(contactId, {
+        session = await this.updateSession(contactId, cwCtx, {
           step: PostStep.INPUT_IMAGE,
           postType: selectedPostType,
           templateId: "food-promo",
@@ -419,7 +438,7 @@ export class PostFlowService {
         await this.whatsappService.sendText(senderPhone, fastMsg, cwCtx);
         return true;
       } else {
-        session = await this.postSessionRepository.createOrUpdate(contactId, {
+        session = await this.updateSession(contactId, cwCtx, {
           step: PostStep.SELECT_TEMPLATE,
           postType: selectedPostType,
           templateId: null,
@@ -437,7 +456,7 @@ export class PostFlowService {
       const defaultTmpl = category.templates[0] || { id: "food-promo", title: "Template Padrão", description: "Design moderno" };
       const selectedTemplate = category.templates[index - 1] || defaultTmpl;
 
-      session = await this.postSessionRepository.createOrUpdate(contactId, {
+      session = await this.updateSession(contactId, cwCtx, {
         step: PostStep.INPUT_COLORS,
         templateId: selectedTemplate.id,
       });
@@ -461,7 +480,7 @@ export class PostFlowService {
         savedColors = null;
       }
 
-      session = await this.postSessionRepository.createOrUpdate(contactId, {
+      session = await this.updateSession(contactId, cwCtx, {
         step: PostStep.INPUT_IMAGE,
         colors: savedColors,
         productTitle: null,
@@ -504,7 +523,7 @@ export class PostFlowService {
         }
 
         if (base64Image) {
-          await this.postSessionRepository.createOrUpdate(contactId, {
+          await this.updateSession(contactId, cwCtx, {
             step: PostStep.INPUT_IMAGE,
             productImage: base64Image,
           });
@@ -556,7 +575,7 @@ export class PostFlowService {
       const nichoDisplay = getNichoDisplayName(session.businessType);
       const postTypeDisplay = getPostTypeDisplayName(session.postType);
 
-      await this.postSessionRepository.createOrUpdate(contactId, {
+      await this.updateSession(contactId, cwCtx, {
         step: PostStep.GENERATING,
         productTitle: title,
         productPrice: price,
@@ -754,6 +773,8 @@ export class PostFlowService {
       }
     }
 
+    let success = false;
+
     try {
       console.log(`[PostFlowService] Gerando arte para ${senderPhone} (Nicho: ${category.name} | Produto: ${productTitle} | Tipo: ${session?.postType || "produto"})...`);
 
@@ -793,6 +814,7 @@ export class PostFlowService {
       await this.whatsappService.sendText(senderPhone, finalDeliveryMsg, cwCtx);
 
       console.log(`[PostFlowService] Fluxo completo concluído com SUCESSO para ${senderPhone}`);
+      success = true;
     } catch (error) {
       console.error(`[PostFlowService] Erro ao gerar arte final:`, error);
       await this.whatsappService.sendText(
@@ -802,7 +824,7 @@ export class PostFlowService {
       );
     } finally {
       // Limpa os dados temporários e redefine preservando o Nicho salvo
-      await this.postSessionRepository.createOrUpdate(contactId, {
+      await this.updateSession(contactId, cwCtx, {
         step: PostStep.SELECT_FLOW_MODE,
         postType: null,
         templateId: null,
@@ -810,6 +832,12 @@ export class PostFlowService {
         productTitle: null,
         productPrice: null,
         productImage: null,
+        ...(success && {
+          lastPostGeneratedAt: new Date(),
+          lastRecoverySentAt: null,
+          lastRetentionSentAt: null,
+          lastWeeklySentAt: null,
+        }),
       });
     }
   }

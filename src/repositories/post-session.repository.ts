@@ -21,6 +21,12 @@ export class PostSessionRepository {
       productTitle?: string | null;
       productPrice?: string | null;
       productImage?: string | null;
+      chatwootAccountId?: string | null;
+      chatwootConversationId?: string | null;
+      lastPostGeneratedAt?: Date | null;
+      lastRecoverySentAt?: Date | null;
+      lastRetentionSentAt?: Date | null;
+      lastWeeklySentAt?: Date | null;
     }
   ): Promise<PostSession> {
     return prisma.postSession.upsert({
@@ -37,6 +43,12 @@ export class PostSessionRepository {
         productTitle: data.productTitle ?? null,
         productPrice: data.productPrice ?? null,
         productImage: data.productImage ?? null,
+        chatwootAccountId: data.chatwootAccountId ?? null,
+        chatwootConversationId: data.chatwootConversationId ?? null,
+        lastPostGeneratedAt: data.lastPostGeneratedAt ?? null,
+        lastRecoverySentAt: data.lastRecoverySentAt ?? null,
+        lastRetentionSentAt: data.lastRetentionSentAt ?? null,
+        lastWeeklySentAt: data.lastWeeklySentAt ?? null,
       },
       update: {
         step: data.step,
@@ -49,6 +61,12 @@ export class PostSessionRepository {
         ...(data.productTitle !== undefined && { productTitle: data.productTitle }),
         ...(data.productPrice !== undefined && { productPrice: data.productPrice }),
         ...(data.productImage !== undefined && { productImage: data.productImage }),
+        ...(data.chatwootAccountId !== undefined && { chatwootAccountId: data.chatwootAccountId }),
+        ...(data.chatwootConversationId !== undefined && { chatwootConversationId: data.chatwootConversationId }),
+        ...(data.lastPostGeneratedAt !== undefined && { lastPostGeneratedAt: data.lastPostGeneratedAt }),
+        ...(data.lastRecoverySentAt !== undefined && { lastRecoverySentAt: data.lastRecoverySentAt }),
+        ...(data.lastRetentionSentAt !== undefined && { lastRetentionSentAt: data.lastRetentionSentAt }),
+        ...(data.lastWeeklySentAt !== undefined && { lastWeeklySentAt: data.lastWeeklySentAt }),
       },
     });
   }
