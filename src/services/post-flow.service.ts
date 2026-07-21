@@ -649,7 +649,7 @@ export class PostFlowService {
       if (session.colors) {
         confirmMsg += `🎨 *Cores:* ${session.colors}\n`;
       }
-      confirmMsg += `\nAplicando o template de ${nichoDisplay} e gerando a arte... ⚙️`;
+      confirmMsg += "\n⚡ *Nossa IA de alta precisão está criando seu design do zero. Em menos de 60 segundos você terá uma arte que levaria 1 hora no Canva!* ⚙️";
 
       await this.whatsappService.sendText(senderPhone, confirmMsg, cwCtx);
 
@@ -866,6 +866,14 @@ export class PostFlowService {
     }
 
     let success = false;
+    let typingInterval: NodeJS.Timeout | null = null;
+
+    if (cwCtx) {
+      this.whatsappService.sendTypingIndicator(senderPhone, cwCtx).catch(() => {});
+      typingInterval = setInterval(() => {
+        this.whatsappService.sendTypingIndicator(senderPhone, cwCtx).catch(() => {});
+      }, 5000);
+    }
 
     try {
       console.log(`[PostFlowService] Gerando arte para ${senderPhone} (Nicho: ${category.name} | Produto: ${productTitle} | Tipo: ${session?.postType || "produto"})...`);
@@ -915,6 +923,13 @@ export class PostFlowService {
         cwCtx
       );
     } finally {
+      if (typingInterval) {
+        clearInterval(typingInterval);
+      }
+      if (cwCtx) {
+        this.whatsappService.stopTypingIndicator(senderPhone, cwCtx).catch(() => {});
+      }
+
       // Limpa os dados temporários e redefine preservando o Nicho salvo
       await this.updateSession(contactId, cwCtx, {
         step: PostStep.SELECT_FLOW_MODE,
