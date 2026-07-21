@@ -106,6 +106,7 @@ export class PostGeneratorService {
     productPrice: string;
     hasHumanModel?: boolean | null | undefined;
     humanModelGender?: string | null | undefined;
+    postType?: string | null | undefined;
     productImage?: string | null | undefined;
     userProfile?: { contactNumber?: string; instagramProfile?: string; logoUrl?: string } | null | undefined;
   }): Promise<{ imageUrl: string; prompt: string }> {
@@ -131,6 +132,7 @@ export class PostGeneratorService {
           dimension: "1:1",
           hasHumanModel: Boolean(data.hasHumanModel),
           humanModelGender: data.humanModelGender || "woman",
+          postType: data.postType || "produto",
           productImages: productImagesJson,
           contactNumber: data.userProfile?.contactNumber,
           instagramProfile: data.userProfile?.instagramProfile,

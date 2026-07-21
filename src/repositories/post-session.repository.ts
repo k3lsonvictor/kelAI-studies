@@ -15,6 +15,7 @@ export class PostSessionRepository {
       businessType?: string | null;
       hasHumanModel?: boolean | null;
       modelProfile?: string | null;
+      postType?: string | null;
       templateId?: string | null;
       productTitle?: string | null;
       productPrice?: string | null;
@@ -29,6 +30,7 @@ export class PostSessionRepository {
         businessType: data.businessType ?? null,
         hasHumanModel: data.hasHumanModel ?? null,
         modelProfile: data.modelProfile ?? null,
+        postType: data.postType ?? null,
         templateId: data.templateId ?? null,
         productTitle: data.productTitle ?? null,
         productPrice: data.productPrice ?? null,
@@ -39,6 +41,7 @@ export class PostSessionRepository {
         ...(data.businessType !== undefined && { businessType: data.businessType }),
         ...(data.hasHumanModel !== undefined && { hasHumanModel: data.hasHumanModel }),
         ...(data.modelProfile !== undefined && { modelProfile: data.modelProfile }),
+        ...(data.postType !== undefined && { postType: data.postType }),
         ...(data.templateId !== undefined && { templateId: data.templateId }),
         ...(data.productTitle !== undefined && { productTitle: data.productTitle }),
         ...(data.productPrice !== undefined && { productPrice: data.productPrice }),

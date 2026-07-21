@@ -59,6 +59,7 @@ enum PostStep {
   SELECT_BUSINESS_TYPE
   SELECT_FASHION_PRESENTATION
   SELECT_FASHION_MODEL
+  SELECT_POST_TYPE
   SELECT_TEMPLATE
   INPUT_TITLE
   INPUT_PRICE
@@ -73,6 +74,7 @@ model PostSession {
   businessType        String?  @map("business_type")
   hasHumanModel       Boolean? @map("has_human_model")
   modelProfile        String?  @map("model_profile")
+  postType            String?  @map("post_type")
   templateId          String?  @map("template_id")
   productTitle        String?  @map("product_title")
   productPrice        String?  @map("product_price")
@@ -83,4 +85,3 @@ model PostSession {
 
   @@map("post_sessions")
 }
-
