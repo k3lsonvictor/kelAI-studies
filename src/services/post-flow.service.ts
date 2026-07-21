@@ -180,6 +180,46 @@ export class PostFlowService {
     const hasSession = Boolean(session);
     const isTrigger = this.isTriggerMessage(cleanText, hasSession);
 
+    // --- GATILHO RE-GERAÇÃO COM OUTRO TEMPLATE ---
+    if (session && (cleanLower === "gerar novamente" || cleanLower === "gerar_novamente" || cleanLower.includes("gerar novamente") || cleanLower.includes("gerar_novamente"))) {
+      if (!session.productTitle) {
+        await this.whatsappService.sendText(
+          senderPhone,
+          "⚠️ Não encontrei os dados do post anterior para gerar novamente. Digite *'novo post'* para começar um do zero!",
+          cwCtx
+        );
+        return true;
+      }
+
+      const category = getCategoryOrDefault(session.businessType);
+      const currentTemplateId = session.templateId || "fashion";
+
+      const currentIndex = category.templates.findIndex((t) => t.id === currentTemplateId);
+      let nextTemplate = category.templates[0]!;
+      if (currentIndex !== -1) {
+        const nextIndex = (currentIndex + 1) % category.templates.length;
+        nextTemplate = category.templates[nextIndex]!;
+      }
+
+      session = await this.updateSession(contactId, cwCtx, {
+        step: PostStep.GENERATING,
+        templateId: nextTemplate.id,
+      });
+
+      let confirmMsg = "Re-gerando sua arte! 🔄\n\n";
+      confirmMsg += `🏷️ *Produto:* ${session.productTitle}\n`;
+      confirmMsg += `💰 *Preço:* ${session.productPrice}\n`;
+      confirmMsg += `📌 *Novo Template:* *${nextTemplate.title}*\n`;
+      if (session.colors) {
+        confirmMsg += `🎨 *Cores:* ${session.colors}\n`;
+      }
+      confirmMsg += "\n⚡ *Nossa IA de alta precisão está criando seu design do zero com um novo layout. Em menos de 60 segundos você terá a nova arte!* ⚙️";
+
+      await this.whatsappService.sendText(senderPhone, confirmMsg, cwCtx);
+      await this.generatePostAndSend(contactId, senderPhone, userProfile, cwCtx);
+      return true;
+    }
+
     // --- COMANDO DE CANCELAMENTO OU ENCERRAMENTO ---
     if (session && this.isCancellationCommand(cleanText)) {
       // Em vez de deletar para não perder o nicho salvo, apenas reiniciamos a sessão preservando o nicho
@@ -319,6 +359,11 @@ export class PostFlowService {
       session = await this.updateSession(contactId, cwCtx, {
         step: PostStep.SELECT_FLOW_MODE,
         templateId: modeStr,
+        postType: null,
+        colors: null,
+        productTitle: null,
+        productPrice: null,
+        productImage: null,
       });
 
       if (session.businessType === "moda") {
@@ -904,6 +949,9 @@ export class PostFlowService {
         cwCtx
       );
 
+      // Delay de 3.5 segundos para garantir que a imagem seja entregue/renderizada antes do texto no celular do usuário
+      await new Promise((resolve) => setTimeout(resolve, 3500));
+
       const sanitizedTitle = productTitle.replace(/[^\w\s]/gi, "").replace(/\s+/g, "");
       const nichoHashtag = category.id === "gastronomia" ? "Padaria #Gastronomia" : category.id === "moda" ? "Moda #Fashion" : "Promocao #Varejo";
 
@@ -915,9 +963,15 @@ export class PostFlowService {
         finalDeliveryMsg += `💳 *Créditos disponíveis:* ${userProfile.credits} post(s)\n\n`;
       }
 
-      finalDeliveryMsg += "🔄 Digite *'novo post'* para criar outra arte ou altere o nicho com *'alterar nicho'*!";
+      finalDeliveryMsg += "Escolha uma das opções abaixo para prosseguir:";
 
-      await this.whatsappService.sendText(senderPhone, finalDeliveryMsg, cwCtx);
+      const buttons = [
+        { id: "gerar_novamente", title: "🔄 Gerar Novamente" },
+        { id: "novo_post", title: "➕ Novo Post" },
+        { id: "alterar_nicho", title: "📁 Alterar Nicho" },
+      ];
+
+      await this.whatsappService.sendButtons(senderPhone, finalDeliveryMsg, buttons, cwCtx);
 
       console.log(`[PostFlowService] Fluxo completo concluído com SUCESSO para ${senderPhone}`);
       success = true;
@@ -936,15 +990,9 @@ export class PostFlowService {
         this.whatsappService.stopTypingIndicator(senderPhone, cwCtx).catch(() => {});
       }
 
-      // Limpa os dados temporários e redefine preservando o Nicho salvo
+      // Redefine apenas o step preservando as informações para possibilitar o "Gerar Novamente"
       await this.updateSession(contactId, cwCtx, {
         step: PostStep.SELECT_FLOW_MODE,
-        postType: null,
-        templateId: null,
-        colors: null,
-        productTitle: null,
-        productPrice: null,
-        productImage: null,
         ...(success && {
           lastPostGeneratedAt: new Date(),
           lastRecoverySentAt: null,
