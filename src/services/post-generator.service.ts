@@ -58,6 +58,8 @@ PRODUTO
 
 {{product_description}}
 
+{{human_model_prompt}}
+
 --------------------------------------------------
 REGRAS OBRIGATÓRIAS
 --------------------------------------------------
@@ -75,7 +77,9 @@ function buildExactGeradorPostsPrompt(
   productName: string,
   price: string,
   userProfile?: { contactNumber?: string; instagramProfile?: string; logoUrl?: string } | null,
-  colors?: string | null
+  colors?: string | null,
+  hasHumanModel?: boolean | null,
+  humanModelGender?: string | null
 ): string {
   let prompt = SYSTEM_PROMPT_TEMPLATE;
   prompt = prompt.replace("{{template_prompt}}", basePrompt);
@@ -93,6 +97,23 @@ function buildExactGeradorPostsPrompt(
   }
 
   prompt = prompt.replace("{{product_description}}", `Use o produto como o elemento principal da composição.`);
+
+  let humanModelPrompt = "";
+  if (hasHumanModel) {
+    const genderStr = humanModelGender === "man" ? "masculino (homem adulto)" : humanModelGender === "kids" ? "infantil (criança / modelo infantil)" : "feminino (mulher adulta)";
+    humanModelPrompt = `
+Adicione um modelo humano ${genderStr} interagindo de forma natural e profissional com o produto (por exemplo, segurando, usando ou vestindo a peça de roupa).
+
+Se o produto for uma peça de vestuário apresentada em um manequim, cabide ou mesa (como camisetas, vestidos, calças, moletons, jaquetas ou roupas em geral), substitua a peça solta por um modelo humano ${genderStr} vestindo exatamente a mesma peça. Preserve fielmente o design da roupa, incluindo cores, estampas, logotipos, modelagem e todos os detalhes originais, sem realizar qualquer alteração.
+
+O modelo deve parecer estar usando a roupa de forma natural, como em um ensaio fotográfico profissional para catálogo de moda ou redes sociais.
+
+Garanta que o produto principal continue em destaque absoluto e não seja modificado, ocultado ou obstruído.
+`;
+  } else {
+    humanModelPrompt = "Não adicione nenhum modelo humano (pessoas, homens ou mulheres) na imagem. O foco visual deve ser puramente no produto.";
+  }
+  prompt = prompt.replace("{{human_model_prompt}}", humanModelPrompt);
 
   const contactText = (userProfile?.contactNumber && userProfile.contactNumber.trim() && userProfile.contactNumber !== "Não fornecido")
     ? `Inclua o número de telefone de contato '${userProfile.contactNumber.trim()}' no post.`
@@ -145,6 +166,7 @@ export class PostGeneratorService {
     const productImagesJson = JSON.stringify([base64Image]);
 
     console.log(`[PostGeneratorService] Dados do Perfil -> Telefone: "${data.userProfile?.contactNumber || 'N/A'}" | Instagram: "${data.userProfile?.instagramProfile || 'N/A'}" | Cores Customizadas: "${data.colors || 'Padrão'}"`);
+    console.log(`[PostGeneratorService] Modelo Humano -> Ativo: ${data.hasHumanModel ?? false} | Perfil: "${data.humanModelGender || 'N/A'}"`);
 
     // 1. Tentar gerar através da API da aplicação gerador-posts-ia (que usa gpt-image-2 e os prompts oficiais)
     if (env.geradorPostsApiUrl && !env.geradorPostsApiUrl.includes("localhost")) {
@@ -188,7 +210,9 @@ export class PostGeneratorService {
       data.productTitle,
       data.productPrice,
       data.userProfile,
-      data.colors
+      data.colors,
+      data.hasHumanModel,
+      data.humanModelGender
     );
 
     console.log(`[PostGeneratorService] Solicitando geração de imagem com o modelo 'gpt-image-2' usando o prompt oficial do template '${template.title}'...`);

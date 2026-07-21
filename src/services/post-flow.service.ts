@@ -831,6 +831,9 @@ export class PostFlowService {
         
         if (session?.modelProfile === "kids" || titleLower.includes("infantil") || titleLower.includes("criança") || titleLower.includes("bebê") || titleLower.includes("kids")) {
           templateId = "kids";
+        } else if (session?.hasHumanModel) {
+          // Se for modelo humano (Adulto), escolhe um template editorial que encaixe o modelo perfeitamente!
+          templateId = "fashion-editorial-slant"; // Moda Editorial
         } else if (titleLower.includes("florido") || titleLower.includes("vestido") || titleLower.includes("saia") || titleLower.includes("estampado") || titleLower.includes("leve") || titleLower.includes("linho") || titleLower.includes("seda") || titleLower.includes("floral") || titleLower.includes("colorido")) {
           templateId = "luxury-single-oval-light"; // Light, elegant off-white/creme
         } else if (titleLower.includes("streetwear") || titleLower.includes("moletom") || titleLower.includes("jaqueta") || titleLower.includes("tênis") || titleLower.includes("tenis") || titleLower.includes("boné") || titleLower.includes("bone")) {
