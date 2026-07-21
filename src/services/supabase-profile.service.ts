@@ -57,17 +57,28 @@ export class SupabaseProfileService {
         return { isAuthorized: false, profile: null };
       }
 
-      // Encontra o perfil correspondente comparando os dígitos do telefone
+      // Encontra o perfil correspondente comparando os dígitos do telefone de forma robusta
       const matchedProfile = data.find((p: SupabaseProfileData) => {
         const pContact = (p.contact_number || p.phone || "").replace(/\D/g, "");
-        if (!pContact) return false;
+        if (!pContact || pContact.length < 8) return false;
 
-        return (
-          cleanDigits === pContact ||
-          cleanDigits.endsWith(pContact) ||
-          pContact.endsWith(cleanDigits) ||
-          (cleanDigits.length >= 8 && pContact.endsWith(cleanDigits.slice(-8)))
-        );
+        const cleanP = pContact.replace(/^55/, "");
+        const cleanIncoming = cleanDigits.replace(/^55/, "");
+
+        if (cleanP === cleanIncoming) return true;
+
+        const last8P = cleanP.slice(-8);
+        const last8Incoming = cleanIncoming.slice(-8);
+
+        if (last8P !== last8Incoming) return false;
+
+        if (cleanP.length >= 10 && cleanIncoming.length >= 10) {
+          const dddP = cleanP.slice(0, 2);
+          const dddIncoming = cleanIncoming.slice(0, 2);
+          return dddP === dddIncoming;
+        }
+
+        return true;
       });
 
       if (!matchedProfile) {
