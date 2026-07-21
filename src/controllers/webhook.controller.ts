@@ -277,6 +277,52 @@ export async function sendChatwootMessage(
 }
 
 /**
+ * Função utilitária exportada para enviar mensagens de seleção/botões interativos de volta ao Chatwoot
+ */
+export async function sendChatwootInteractiveMessage(
+  accountId: number | string,
+  conversationId: number | string,
+  bodyText: string,
+  items: Array<{ title: string; value: string }>
+) {
+  const chatwootUrl = env.chatwootUrl;
+  const chatwootToken = env.chatwootToken;
+
+  if (!chatwootUrl || !chatwootToken) {
+    console.warn("[Chatwoot] CHATWOOT_URL ou CHATWOOT_ACCESS_TOKEN não configurado.");
+    return;
+  }
+
+  try {
+    const res = await fetch(`${chatwootUrl}/api/v1/accounts/${accountId}/conversations/${conversationId}/messages`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "api_access_token": chatwootToken,
+      },
+      body: JSON.stringify({
+        content: bodyText,
+        content_type: "input_select",
+        content_attributes: {
+          items: items.map((i) => ({ title: i.title, value: i.value })),
+        },
+        message_type: "outgoing",
+        private: false,
+      }),
+    });
+
+    if (!res.ok) {
+      const fallbackText = bodyText + "\n\n" + items.map((i) => `${i.title}`).join("\n");
+      await sendChatwootMessage(accountId, conversationId, fallbackText);
+    } else {
+      console.log(`[Chatwoot] Mensagem interativa despachada com SUCESSO para conversa ${conversationId} no Chatwoot.`);
+    }
+  } catch (err: any) {
+    console.error(`[Chatwoot] Exceção ao enviar mensagem interativa para Chatwoot:`, err.message || err);
+  }
+}
+
+/**
  * Função utilitária exportada para enviar anexos de imagem de volta ao Chatwoot via multipart/form-data
  */
 export async function sendChatwootImageMessage(

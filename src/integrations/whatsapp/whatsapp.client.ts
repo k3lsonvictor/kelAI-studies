@@ -18,8 +18,6 @@ export class WhatsAppClient {
 
   /**
    * Envia uma mensagem de texto simples pelo WhatsApp
-   * @param to Número de telefone do destinatário no formato internacional (ex: 5586999999999)
-   * @param text Texto da mensagem
    */
   async sendTextMessage(to: string, text: string): Promise<WhatsAppSendResponse> {
     try {
@@ -41,12 +39,86 @@ export class WhatsAppClient {
   }
 
   /**
+   * Envia uma mensagem com botões interativos clicáveis (até 3 botões) pelo WhatsApp.
+   */
+  async sendInteractiveButtons(
+    to: string,
+    bodyText: string,
+    buttons: Array<{ id: string; title: string }>
+  ): Promise<WhatsAppSendResponse> {
+    try {
+      const response = await this.http.post<WhatsAppSendResponse>("/messages", {
+        messaging_product: "whatsapp",
+        recipient_type: "individual",
+        to,
+        type: "interactive",
+        interactive: {
+          type: "button",
+          body: {
+            text: bodyText,
+          },
+          action: {
+            buttons: buttons.slice(0, 3).map((b) => ({
+              type: "reply",
+              reply: {
+                id: b.id,
+                title: b.title.slice(0, 20), // Limite de 20 caracteres exigido pela Meta
+              },
+            })),
+          },
+        },
+      });
+
+      return response.data;
+    } catch (error) {
+      this.handleError(error, `Erro ao enviar botões interativos para ${to}`);
+      throw error;
+    }
+  }
+
+  /**
+   * Envia uma mensagem de lista interativa (menu expansível com gaveta de opções) pelo WhatsApp.
+   */
+  async sendInteractiveList(
+    to: string,
+    bodyText: string,
+    buttonText: string,
+    sections: Array<{ title: string; rows: Array<{ id: string; title: string; description?: string }> }>
+  ): Promise<WhatsAppSendResponse> {
+    try {
+      const response = await this.http.post<WhatsAppSendResponse>("/messages", {
+        messaging_product: "whatsapp",
+        recipient_type: "individual",
+        to,
+        type: "interactive",
+        interactive: {
+          type: "list",
+          body: {
+            text: bodyText,
+          },
+          action: {
+            button: buttonText.slice(0, 20),
+            sections: sections.map((s) => ({
+              title: s.title.slice(0, 24),
+              rows: s.rows.slice(0, 10).map((r) => ({
+                id: r.id,
+                title: r.title.slice(0, 24),
+                ...(r.description && { description: r.description.slice(0, 72) }),
+              })),
+            })),
+          },
+        },
+      });
+
+      return response.data;
+    } catch (error) {
+      this.handleError(error, `Erro ao enviar lista interativa para ${to}`);
+      throw error;
+    }
+  }
+
+  /**
    * Envia uma imagem com legenda pelo WhatsApp.
-   * Se a URL da imagem for um Data URL base64 (gerado pelo gpt-image-2), faz o upload prévio
-   * para a Meta Media API e despacha a mensagem utilizando o ID do arquivo de mídia retornado.
-   * @param to Número de telefone do destinatário
-   * @param imageUrl URL pública da imagem (HTTP/HTTPS) ou string base64 Data URL
-   * @param caption Legenda da imagem (opcional)
    */
   async sendImageMessage(to: string, imageUrl: string, caption?: string): Promise<WhatsAppSendResponse> {
     try {
@@ -84,7 +156,6 @@ export class WhatsAppClient {
 
   /**
    * Envia o buffer binário de uma imagem base64 para o endpoint de upload de mídia da Meta (/media)
-   * e retorna o ID da mídia gerada.
    */
   async uploadMediaBase64(base64DataUrl: string): Promise<string> {
     try {
@@ -129,7 +200,6 @@ export class WhatsAppClient {
    */
   async downloadMediaAsBase64(mediaId: string): Promise<string> {
     try {
-      // 1. Obter URL do arquivo de mídia na Graph API Meta
       const metaResponse = await axios.get<{ url: string; mime_type: string }>(
         `https://graph.facebook.com/v23.0/${mediaId}`,
         {
@@ -142,7 +212,6 @@ export class WhatsAppClient {
       const mediaUrl = metaResponse.data.url;
       const mimeType = metaResponse.data.mime_type || "image/jpeg";
 
-      // 2. Fazer o download do arquivo de mídia binário
       const mediaBufferResponse = await axios.get(mediaUrl, {
         headers: {
           Authorization: `Bearer ${env.whatsappToken}`,

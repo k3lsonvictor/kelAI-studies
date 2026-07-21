@@ -17,7 +17,7 @@ import type { AIService } from "./ai.service.js";
 import { parseTitleAndPriceRegex } from "./ai.service.js";
 
 /**
- * Utilitário para baixar imagem a partir de uma URL remota (ex: anexos do Chatwoot) e converter em Base64 Data URL
+ * Utilitário para baixar imagem a partir de uma URL remota e converter em Base64 Data URL
  */
 async function downloadImageFromUrlAsBase64(url: string): Promise<string> {
   const response = await axios.get(url, { responseType: "arraybuffer", timeout: 30000 });
@@ -93,7 +93,7 @@ export class PostFlowService {
   }
 
   /**
-   * Verifica se a mensagem é um comando para alterar o tipo/formato do post (1 produto, combo, promoção, encarte)
+   * Verifica se a mensagem é um comando para alterar o tipo/formato do post
    */
   isPostTypeChangeCommand(text: string): boolean {
     const clean = text.trim().toLowerCase();
@@ -132,7 +132,6 @@ export class PostFlowService {
       return true;
     }
 
-    // Se NÃO houver sessão criada, qualquer mensagem inicial direciona para o fluxo de criação de posts
     if (!hasActiveSession) {
       return true;
     }
@@ -141,7 +140,7 @@ export class PostFlowService {
   }
 
   /**
-   * Orquestra o fluxo de criação de posts
+   * Orquestra o fluxo de criação de posts com botões e listas interativas no WhatsApp
    */
   async handlePostFlow(
     contactId: string,
@@ -156,12 +155,11 @@ export class PostFlowService {
       ? { accountId: incomingMsg.chatwootAccountId, conversationId: incomingMsg.chatwootConversationId }
       : undefined;
 
-    // 1. Buscar a sessão ativa para este contato
     let session = await this.postSessionRepository.findByContactId(contactId);
     const hasSession = Boolean(session);
     const isTrigger = this.isTriggerMessage(cleanText, hasSession);
 
-    // --- COMANDO DE CANCELAMENTO OU ENCERRAMENTO DO FLUXO ---
+    // --- COMANDO DE CANCELAMENTO OU ENCERRAMENTO ---
     if (session && this.isCancellationCommand(cleanText)) {
       await this.postSessionRepository.deleteByContactId(contactId);
       await this.whatsappService.sendText(
@@ -181,14 +179,11 @@ export class PostFlowService {
         productImage: null,
       });
 
-      let changeNichoMsg = "🔄 *Alterar Segmento / Nicho do Negócio*\n\n";
-      changeNichoMsg += "Para qual segmento você deseja alterar a sua conta?\n\n";
-      changeNichoMsg += "1️⃣ Padaria / Alimentação / Café\n";
-      changeNichoMsg += "2️⃣ Loja de Roupas / Moda\n";
-      changeNichoMsg += "3️⃣ Varejo / Mercadinho / Utilidades\n";
-      changeNichoMsg += "4️⃣ Outro";
-
-      await this.whatsappService.sendText(senderPhone, changeNichoMsg, cwCtx);
+      await this.sendBusinessTypePrompt(
+        senderPhone,
+        "🔄 *Alterar Segmento do Negócio*\n\nPara qual segmento você deseja alterar a sua conta?",
+        cwCtx
+      );
       return true;
     }
 
@@ -201,15 +196,11 @@ export class PostFlowService {
         productImage: null,
       });
 
-      let postTypeMsg = "📌 *Escolha o Tipo de Post*\n\n";
-      postTypeMsg += "Como você deseja apresentar o seu produto ou oferta?\n\n";
-      postTypeMsg += "1️⃣ *Produto Único* (Destaque para 1 produto)\n\n";
-      postTypeMsg += "2️⃣ *Combo / Kit* (Dois ou mais produtos juntos)\n\n";
-      postTypeMsg += "3️⃣ *Promoção / Oferta* (Destaque de preço e desconto)\n\n";
-      postTypeMsg += "4️⃣ *Encarte / Tabela* (Estilo lista de ofertas)\n\n";
-      postTypeMsg += "*(Digite o número da opção desejada)*";
-
-      await this.whatsappService.sendText(senderPhone, postTypeMsg, cwCtx);
+      await this.sendPostTypePrompt(
+        senderPhone,
+        "📌 *Alterar Tipo de Post*\n\nComo você deseja apresentar o seu produto ou oferta?",
+        cwCtx
+      );
       return true;
     }
 
@@ -219,7 +210,6 @@ export class PostFlowService {
         return false;
       }
 
-      // Reinicia a sessão limpando imagens e títulos anteriores
       session = await this.postSessionRepository.createOrUpdate(contactId, {
         step: PostStep.SELECT_FLOW_MODE,
         businessType: session?.businessType ?? null,
@@ -232,15 +222,11 @@ export class PostFlowService {
         templateId: null,
       });
 
-      let modeMsg = "Como você deseja criar o seu post hoje? 🚀\n\n";
-      modeMsg += "1️⃣ *Post Rápido* (Envie 1 foto com Nome e Preço na legenda e a IA cria a arte na hora!)\n\n";
-      modeMsg += "2️⃣ *Post Personalizado* (Escolha o tipo de post e selecione o modelo/template visual)";
-
-      await this.whatsappService.sendText(senderPhone, modeMsg, cwCtx);
+      await this.sendFlowModePrompt(senderPhone, cwCtx);
       return true;
     }
 
-    // --- ETAPA: Processar Seleção do Modo de Criação ---
+    // --- ETAPA: Processar Seleção do Modo de Criação (Post Rápido vs Personalizado) ---
     if (session.step === PostStep.SELECT_FLOW_MODE) {
       if (cleanText === "1" || cleanLower.includes("rapido") || cleanLower.includes("rápido")) {
         // MODO 1: POST RÁPIDO
@@ -275,14 +261,11 @@ export class PostFlowService {
             productImage: null,
           });
 
-          let welcomeMsg = "🎨 *Modo Post Personalizado*\n\n";
-          welcomeMsg += "Para eu ajustar os modelos para a sua marca, qual é o seu segmento/nicho?\n\n";
-          welcomeMsg += "1️⃣ Padaria / Alimentação / Café\n";
-          welcomeMsg += "2️⃣ Loja de Roupas / Moda\n";
-          welcomeMsg += "3️⃣ Varejo / Mercadinho / Utilidades\n";
-          welcomeMsg += "4️⃣ Outro";
-
-          await this.whatsappService.sendText(senderPhone, welcomeMsg, cwCtx);
+          await this.sendBusinessTypePrompt(
+            senderPhone,
+            "🎨 *Modo Post Personalizado*\n\nPara eu ajustar os modelos para a sua marca, qual é o seu segmento/nicho?",
+            cwCtx
+          );
           return true;
         } else {
           await this.postSessionRepository.createOrUpdate(contactId, {
@@ -292,35 +275,30 @@ export class PostFlowService {
             productImage: null,
           });
 
-          let postTypeMsg = "📌 *Tipo de Post*\n\n";
-          postTypeMsg += "Como você deseja apresentar o seu produto ou oferta?\n\n";
-          postTypeMsg += "1️⃣ *Produto Único* (Destaque para 1 produto)\n\n";
-          postTypeMsg += "2️⃣ *Combo / Kit* (Dois ou mais produtos juntos)\n\n";
-          postTypeMsg += "3️⃣ *Promoção / Oferta* (Destaque de preço e desconto)\n\n";
-          postTypeMsg += "4️⃣ *Encarte / Tabela* (Estilo lista de ofertas)\n\n";
-          postTypeMsg += "*(Digite o número da opção desejada)*";
-
-          await this.whatsappService.sendText(senderPhone, postTypeMsg, cwCtx);
+          await this.sendPostTypePrompt(
+            senderPhone,
+            "📌 *Tipo de Post*\n\nComo você deseja apresentar o seu produto ou oferta?",
+            cwCtx
+          );
           return true;
         }
       }
 
-      let retryMsg = "⚠️ *Opção inválida.*\n\nPor favor, digite:\n1️⃣ para *Post Rápido*\n2️⃣ para *Post Personalizado*";
-      await this.whatsappService.sendText(senderPhone, retryMsg, cwCtx);
+      await this.sendFlowModePrompt(senderPhone, cwCtx);
       return true;
     }
 
-    // --- ETAPA: Seleção de Nicho ---
+    // --- ETAPA: Seleção de Nicho (Menu Lista) ---
     if (session.step === PostStep.SELECT_BUSINESS_TYPE) {
       let selectedBusinessType = "gastronomia";
 
       if (cleanText === "2" || cleanLower.includes("moda") || cleanLower.includes("roupa")) {
         selectedBusinessType = "moda";
-      } else if (cleanText === "3" || cleanLower.includes("varejo") || cleanLower.includes("mercadinho")) {
+      } else if (cleanText === "3" || cleanLower.includes("varejo") || cleanLower.includes("mercadinho") || cleanLower.includes("mercado")) {
         selectedBusinessType = "promocao";
       } else if (cleanText === "4" || cleanLower.includes("outro")) {
         selectedBusinessType = "geral";
-      } else if (cleanText === "1" || cleanLower.includes("padaria") || cleanLower.includes("alimentacao") || cleanLower.includes("alimentação")) {
+      } else {
         selectedBusinessType = "gastronomia";
       }
 
@@ -330,11 +308,7 @@ export class PostFlowService {
           businessType: "moda",
         });
 
-        let fashionPresentationMsg = "Perfeito! Como você quer a apresentação das suas peças de roupa?\n\n";
-        fashionPresentationMsg += "1️⃣ Foto Real do Produto (No cabide, na arara ou mesa)\n\n";
-        fashionPresentationMsg += "2️⃣ Aplicar Modelo Virtual (A IA veste a roupa em uma modelo)";
-
-        await this.whatsappService.sendText(senderPhone, fashionPresentationMsg, cwCtx);
+        await this.sendFashionPresentationPrompt(senderPhone, cwCtx);
         return true;
       }
 
@@ -345,19 +319,15 @@ export class PostFlowService {
         modelProfile: null,
       });
 
-      let postTypeMsg = `✅ *Nicho configurado como ${getNichoDisplayName(selectedBusinessType)}!*\n\n`;
-      postTypeMsg += "📌 Agora escolha o *Tipo de Post*:\n\n";
-      postTypeMsg += "1️⃣ *Produto Único* (Destaque para 1 produto)\n\n";
-      postTypeMsg += "2️⃣ *Combo / Kit* (Dois ou mais produtos juntos)\n\n";
-      postTypeMsg += "3️⃣ *Promoção / Oferta* (Destaque de preço e desconto)\n\n";
-      postTypeMsg += "4️⃣ *Encarte / Tabela* (Estilo lista de ofertas)\n\n";
-      postTypeMsg += "*(Digite o número da opção desejada)*";
-
-      await this.whatsappService.sendText(senderPhone, postTypeMsg, cwCtx);
+      await this.sendPostTypePrompt(
+        senderPhone,
+        `✅ *Nicho configurado como ${getNichoDisplayName(selectedBusinessType)}!*\n\n📌 Escolha o *Tipo de Post*:`,
+        cwCtx
+      );
       return true;
     }
 
-    // --- ETAPA MODA 2: Foto Real vs Modelo Virtual ---
+    // --- ETAPA MODA 2: Foto Real vs Modelo Virtual (Botões Interativos) ---
     if (session.step === PostStep.SELECT_FASHION_PRESENTATION) {
       if (cleanText === "2" || cleanLower.includes("modelo") || cleanLower.includes("virtual") || cleanLower.includes("ia")) {
         await this.postSessionRepository.createOrUpdate(contactId, {
@@ -365,12 +335,7 @@ export class PostFlowService {
           hasHumanModel: true,
         });
 
-        let fashionModelMsg = "Show! Escolha quem vai vestir a peça:\n\n";
-        fashionModelMsg += "👩 1️⃣ Mulher Adulta\n\n";
-        fashionModelMsg += "👨 2️⃣ Homem Adulto\n\n";
-        fashionModelMsg += "🧒 3️⃣ Criança / Infantil";
-
-        await this.whatsappService.sendText(senderPhone, fashionModelMsg, cwCtx);
+        await this.sendFashionModelPrompt(senderPhone, cwCtx);
         return true;
       } else {
         await this.postSessionRepository.createOrUpdate(contactId, {
@@ -379,19 +344,16 @@ export class PostFlowService {
           modelProfile: null,
         });
 
-        let postTypeMsg = "Perfeito! Nicho de Moda (Foto Real) configurado!\n\n";
-        postTypeMsg += "📌 Escolha o *Tipo de Post*:\n\n";
-        postTypeMsg += "1️⃣ *Produto Único* (Destaque para 1 produto)\n\n";
-        postTypeMsg += "2️⃣ *Combo / Kit* (Dois ou mais produtos juntos)\n\n";
-        postTypeMsg += "3️⃣ *Promoção / Oferta* (Destaque de preço e desconto)\n\n";
-        postTypeMsg += "4️⃣ *Encarte / Tabela* (Estilo lista de ofertas)";
-
-        await this.whatsappService.sendText(senderPhone, postTypeMsg, cwCtx);
+        await this.sendPostTypePrompt(
+          senderPhone,
+          "Perfeito! Nicho de Moda (Foto Real) configurado!\n\n📌 Escolha o *Tipo de Post*:",
+          cwCtx
+        );
         return true;
       }
     }
 
-    // --- ETAPA MODA 3: Modelo Virtual ---
+    // --- ETAPA MODA 3: Modelo Virtual (Botões Interativos) ---
     if (session.step === PostStep.SELECT_FASHION_MODEL) {
       let selectedModelProfile = "woman";
 
@@ -409,18 +371,15 @@ export class PostFlowService {
         modelProfile: selectedModelProfile,
       });
 
-      let postTypeMsg = "Perfeito! Modelo Virtual selecionado!\n\n";
-      postTypeMsg += "📌 Escolha o *Tipo de Post*:\n\n";
-      postTypeMsg += "1️⃣ *Produto Único* (Destaque para 1 produto)\n\n";
-      postTypeMsg += "2️⃣ *Combo / Kit* (Dois ou mais produtos juntos)\n\n";
-      postTypeMsg += "3️⃣ *Promoção / Oferta* (Destaque de preço e desconto)\n\n";
-      postTypeMsg += "4️⃣ *Encarte / Tabela* (Estilo lista de ofertas)";
-
-      await this.whatsappService.sendText(senderPhone, postTypeMsg, cwCtx);
+      await this.sendPostTypePrompt(
+        senderPhone,
+        "Perfeito! Modelo Virtual selecionado!\n\n📌 Escolha o *Tipo de Post*:",
+        cwCtx
+      );
       return true;
     }
 
-    // --- ETAPA: Seleção do Tipo de Post ---
+    // --- ETAPA: Seleção do Tipo de Post (Menu Lista Interativa) ---
     if (session.step === PostStep.SELECT_POST_TYPE) {
       let selectedPostType = "produto";
 
@@ -443,7 +402,7 @@ export class PostFlowService {
       return true;
     }
 
-    // --- ETAPA: Seleção de Template ---
+    // --- ETAPA: Seleção de Template (Menu Lista Interativa de Templates) ---
     if (session.step === PostStep.SELECT_TEMPLATE) {
       const category = getCategoryOrDefault(session.businessType);
       const index = parseInt(cleanText, 10);
@@ -623,8 +582,88 @@ export class PostFlowService {
     return false;
   }
 
+  // --- PROMPTS INTERATIVOS (BOTÕES E LISTAS NATIVAS DO WHATSAPP) ---
+
+  private async sendFlowModePrompt(
+    senderPhone: string,
+    cwCtx?: { accountId?: number | string; conversationId?: number | string }
+  ) {
+    let text = "Como você deseja criar o seu post hoje? 🚀\n\n";
+    text += "1️⃣ *Post Rápido* (Envie 1 foto com Nome e Preço na legenda e a IA cria a arte na hora!)\n\n";
+    text += "2️⃣ *Post Personalizado* (Escolha o nicho, tipo de post e selecione o modelo/template visual)";
+
+    const buttons = [
+      { id: "1", title: "⚡ Post Rápido" },
+      { id: "2", title: "🎨 Personalizado" },
+    ];
+    await this.whatsappService.sendButtons(senderPhone, text, buttons, cwCtx);
+  }
+
+  private async sendBusinessTypePrompt(
+    senderPhone: string,
+    headerText: string,
+    cwCtx?: { accountId?: number | string; conversationId?: number | string }
+  ) {
+    const sections = [
+      {
+        title: "Segmentos do Negócio",
+        rows: [
+          { id: "1", title: "Padaria / Café", description: "Padarias, confeitarias e alimentação" },
+          { id: "2", title: "Loja de Roupas", description: "Moda masculina, feminina e infantil" },
+          { id: "3", title: "Varejo / Mercado", description: "Mercadinhos, conveniências e utilidades" },
+          { id: "4", title: "Outro Segmento", description: "Serviços e comércios em geral" },
+        ],
+      },
+    ];
+    await this.whatsappService.sendList(senderPhone, headerText, "Escolher Nicho", sections, cwCtx);
+  }
+
+  private async sendFashionPresentationPrompt(
+    senderPhone: string,
+    cwCtx?: { accountId?: number | string; conversationId?: number | string }
+  ) {
+    const text = "Perfeito! Como você quer a apresentação das suas peças de roupa?";
+    const buttons = [
+      { id: "1", title: "📸 Foto Real" },
+      { id: "2", title: "🤖 Modelo Virtual" },
+    ];
+    await this.whatsappService.sendButtons(senderPhone, text, buttons, cwCtx);
+  }
+
+  private async sendFashionModelPrompt(
+    senderPhone: string,
+    cwCtx?: { accountId?: number | string; conversationId?: number | string }
+  ) {
+    const text = "Show! Escolha quem vai vestir a peça:";
+    const buttons = [
+      { id: "1", title: "👩 Mulher Adulta" },
+      { id: "2", title: "👨 Homem Adulto" },
+      { id: "3", title: "🧒 Criança / Infantil" },
+    ];
+    await this.whatsappService.sendButtons(senderPhone, text, buttons, cwCtx);
+  }
+
+  private async sendPostTypePrompt(
+    senderPhone: string,
+    headerText: string,
+    cwCtx?: { accountId?: number | string; conversationId?: number | string }
+  ) {
+    const sections = [
+      {
+        title: "Formatos de Publicação",
+        rows: [
+          { id: "1", title: "Produto Único", description: "Destaque comercial de 1 produto principal" },
+          { id: "2", title: "Combo / Kit", description: "Dois ou mais produtos num pacote promocional" },
+          { id: "3", title: "Promoção / Oferta", description: "Destaque para valores e descontos especiais" },
+          { id: "4", title: "Encarte / Tabela", description: "Estilo catálogo ou encarte de supermercado" },
+        ],
+      },
+    ];
+    await this.whatsappService.sendList(senderPhone, headerText, "Escolher Formato", sections, cwCtx);
+  }
+
   /**
-   * Envia a imagem do guia visual e o menu de templates do nicho
+   * Envia a imagem do guia visual e a lista interativa de templates do nicho
    */
   private async sendTemplatesMenu(
     contactId: string,
@@ -661,16 +700,24 @@ export class PostFlowService {
       console.warn(`[PostFlowService] Falha ao enviar imagem do guia visual: ${assetErr.message}`);
     }
 
-    let templateMenu = `✨ *Templates para ${category.name}* ✨\n\n`;
-    templateMenu += "Escolha o estilo do template para sua arte:\n\n";
+    const rows = category.templates.map((tmpl, index) => ({
+      id: String(index + 1),
+      title: tmpl.title.slice(0, 24),
+      description: tmpl.description.slice(0, 72),
+    }));
 
-    category.templates.forEach((tmpl, index) => {
-      templateMenu += `*${index + 1}* - *${tmpl.title}*\n   _${tmpl.description}_\n\n`;
-    });
-
-    templateMenu += "*(Digite o número do template escolhido)*";
-
-    await this.whatsappService.sendText(senderPhone, templateMenu, cwCtx);
+    await this.whatsappService.sendList(
+      senderPhone,
+      `✨ *Templates para ${category.name}* ✨\n\nEscolha o estilo do template para a sua arte:`,
+      "Ver Templates",
+      [
+        {
+          title: `Templates de ${category.name}`,
+          rows,
+        },
+      ],
+      cwCtx
+    );
   }
 
   /**

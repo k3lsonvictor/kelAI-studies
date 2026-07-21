@@ -15,6 +15,7 @@ export interface IncomingMessageDTO {
 
 /**
  * Helper para extrair e normalizar dados do webhook da Meta para o DTO da aplicação.
+ * Suporta mensagens de texto, mídia e botões/listas interativos do WhatsApp.
  */
 export function parseIncomingMessage(payload: any): IncomingMessageDTO[] {
   const messagesList: IncomingMessageDTO[] = [];
@@ -41,6 +42,13 @@ export function parseIncomingMessage(payload: any): IncomingMessageDTO[] {
     if (msg.type === "text") {
       type = "text";
       body = msg.text?.body || "";
+    } else if (msg.type === "interactive") {
+      type = "text";
+      if (msg.interactive?.type === "button_reply") {
+        body = msg.interactive.button_reply?.id || msg.interactive.button_reply?.title || "";
+      } else if (msg.interactive?.type === "list_reply") {
+        body = msg.interactive.list_reply?.id || msg.interactive.list_reply?.title || "";
+      }
     } else if (msg.type === "image") {
       type = "image";
       mediaId = msg.image?.id;
