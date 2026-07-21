@@ -180,48 +180,48 @@ export const BUSINESS_CATEGORIES: BusinessCategoryConfig[] = [
       },
     ],
   },
-  {
-    id: "beleza",
-    name: "Beleza / Cosméticos",
-    templates: [
-      {
-        id: "estetica-spa",
-        title: "Estética & Spa",
-        description: "Suave, relaxante e clean",
-        basePrompt: "Crie um post para clínica de estética ou spa com tons pastéis, folhagens suaves, iluminação limpa e atmosfera relaxante.",
-      },
-      {
-        id: "cosmeticos-boutique",
-        title: "Cosméticos & Perfumaria",
-        description: "Elegante e luxuoso",
-        basePrompt: "Crie uma arte para cosméticos/perfumaria com reflexos de água/estúdio, frasco em destaque, pedras ou minerais sutis e acabamento premium.",
-      },
-    ],
-  },
-  {
-    id: "geral",
-    name: "Geral / Serviços",
-    templates: [
-      {
-        id: "minimalista",
-        title: "Minimalista",
-        description: "Foco absoluto no produto com fundo neutro",
-        basePrompt: "Crie um design minimalista limpo com bastante espaço negativo, fundo neutro, poucos elementos e foco absoluto no produto.",
-      },
-      {
-        id: "moderno",
-        title: "Moderno",
-        description: "Formas geométricas e dinamismo",
-        basePrompt: "Crie um layout contemporâneo com formas geométricas limpas, contraste profissional e apresentação versátil.",
-      },
-      {
-        id: "elegante",
-        title: "Elegante Premium",
-        description: "Dark mode sofisticado",
-        basePrompt: "Crie um layout escuro elegante com iluminação de destaque dramática e elementos discretos de alto luxo.",
-      },
-    ],
-  },
+  // {
+  //   id: "beleza",
+  //   name: "Beleza / Cosméticos",
+  //   templates: [
+  //     {
+  //       id: "estetica-spa",
+  //       title: "Estética & Spa",
+  //       description: "Suave, relaxante e clean",
+  //       basePrompt: "Crie um post para clínica de estética ou spa com tons pastéis, folhagens suaves, iluminação limpa e atmosfera relaxante.",
+  //     },
+  //     {
+  //       id: "cosmeticos-boutique",
+  //       title: "Cosméticos & Perfumaria",
+  //       description: "Elegante e luxuoso",
+  //       basePrompt: "Crie uma arte para cosméticos/perfumaria com reflexos de água/estúdio, frasco em destaque, pedras ou minerais sutis e acabamento premium.",
+  //     },
+  //   ],
+  // },
+  // {
+  //   id: "geral",
+  //   name: "Geral / Serviços",
+  //   templates: [
+  //     {
+  //       id: "minimalista",
+  //       title: "Minimalista",
+  //       description: "Foco absoluto no produto com fundo neutro",
+  //       basePrompt: "Crie um design minimalista limpo com bastante espaço negativo, fundo neutro, poucos elementos e foco absoluto no produto.",
+  //     },
+  //     {
+  //       id: "moderno",
+  //       title: "Moderno",
+  //       description: "Formas geométricas e dinamismo",
+  //       basePrompt: "Crie um layout contemporâneo com formas geométricas limpas, contraste profissional e apresentação versátil.",
+  //     },
+  //     {
+  //       id: "elegante",
+  //       title: "Elegante Premium",
+  //       description: "Dark mode sofisticado",
+  //       basePrompt: "Crie um layout escuro elegante com iluminação de destaque dramática e elementos discretos de alto luxo.",
+  //     },
+  //   ],
+  // },
 ];
 
 export function findCategoryByIndexOrId(input: string): BusinessCategoryConfig | undefined {

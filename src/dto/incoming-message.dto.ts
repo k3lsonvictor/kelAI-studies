@@ -7,7 +7,10 @@ export interface IncomingMessageDTO {
   body: string;
   phoneNumberId: string;
   mediaId?: string | undefined;
+  mediaUrl?: string | undefined;
   caption?: string | undefined;
+  chatwootAccountId?: number | string | undefined;
+  chatwootConversationId?: number | string | undefined;
 }
 
 /**

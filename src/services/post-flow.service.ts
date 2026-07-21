@@ -12,6 +12,7 @@ import {
 } from "../config/templates.config.js";
 import { PostStep } from "@prisma/client";
 import type { IncomingMessageDTO } from "../dto/incoming-message.dto.js";
+import type { UserProfileInfo } from "./supabase-profile.service.js";
 
 export class PostFlowService {
   constructor(
@@ -44,7 +45,8 @@ export class PostFlowService {
    */
   async handlePostFlow(
     contactId: string,
-    incomingMsg: IncomingMessageDTO
+    incomingMsg: IncomingMessageDTO,
+    userProfile?: UserProfileInfo | null
   ): Promise<boolean> {
     const senderPhone = incomingMsg.senderPhone;
     const cleanText = incomingMsg.body.trim();
@@ -262,7 +264,7 @@ export class PostFlowService {
         productImage: base64Image,
       });
 
-      await this.generatePostAndSend(contactId, senderPhone);
+      await this.generatePostAndSend(contactId, senderPhone, userProfile);
       return true;
     }
 
@@ -281,7 +283,11 @@ export class PostFlowService {
   /**
    * Método auxiliar para orquestrar a geração do post na OpenAI/gerador-posts-ia e disparar o envio via WhatsApp
    */
-  private async generatePostAndSend(contactId: string, senderPhone: string): Promise<void> {
+  private async generatePostAndSend(
+    contactId: string,
+    senderPhone: string,
+    userProfile?: UserProfileInfo | null
+  ): Promise<void> {
     const session = await this.postSessionRepository.findByContactId(contactId);
 
     const category = getCategoryOrDefault(session?.businessType);
@@ -297,13 +303,19 @@ export class PostFlowService {
     statusMsg += `• Template: *${template.title}*\n`;
     statusMsg += `• Produto: *${productTitle}*\n`;
     statusMsg += `• Valor: *${productPrice}*\n`;
+    if (userProfile?.instagramProfile) {
+      statusMsg += `• Instagram no post: *${userProfile.instagramProfile}*\n`;
+    }
+    if (userProfile?.contactNumber) {
+      statusMsg += `• Telefone no post: *${userProfile.contactNumber}*\n`;
+    }
     statusMsg += `• Foto enviada: *${productImage ? "Sim 📸" : "Não (Criar do zero)"}*\n\n`;
     statusMsg += "⏳ A IA está processando e gerando a imagem em alta definição. Aguarde alguns segundos!";
 
     await this.whatsappService.sendText(senderPhone, statusMsg);
 
     try {
-      console.log(`[PostFlowService] Solicitando geração de post para ${senderPhone} (com foto: ${!!productImage})...`);
+      console.log(`[PostFlowService] Solicitando geração de post para ${senderPhone} (com foto: ${!!productImage} | Instagram: ${userProfile?.instagramProfile || 'N/A'})...`);
 
       const result = await this.postGeneratorService.generatePostImage({
         businessType: category.id,
@@ -311,6 +323,7 @@ export class PostFlowService {
         productTitle,
         productPrice,
         productImage,
+        userProfile,
       });
 
       // Envia a imagem gerada via WhatsApp

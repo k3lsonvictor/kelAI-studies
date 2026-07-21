@@ -62,7 +62,8 @@ REGRAS OBRIGATÓRIAS
 function buildExactGeradorPostsPrompt(
   basePrompt: string,
   productName: string,
-  price: string
+  price: string,
+  userProfile?: { contactNumber?: string; instagramProfile?: string; logoUrl?: string } | null
 ): string {
   let prompt = SYSTEM_PROMPT_TEMPLATE;
   prompt = prompt.replace("{{template_prompt}}", basePrompt);
@@ -73,6 +74,9 @@ function buildExactGeradorPostsPrompt(
   prompt = prompt.replace("{{primary_color}}", "#4f46e5");
   prompt = prompt.replace("{{secondary_color}}", "#f59e0b");
   prompt = prompt.replace("{{product_description}}", `Use o produto como o elemento principal da composição.`);
+  prompt = prompt.replace("{{contact_number}}", userProfile?.contactNumber || "Não fornecido");
+  prompt = prompt.replace("{{instagram_profile}}", userProfile?.instagramProfile || "Não fornecido");
+  prompt = prompt.replace("{{logo_url}}", userProfile?.logoUrl || "Não fornecido");
   return prompt;
 }
 
@@ -92,7 +96,8 @@ export class PostGeneratorService {
     templateId: string;
     productTitle: string;
     productPrice: string;
-    productImage?: string | null;
+    productImage?: string | null | undefined;
+    userProfile?: { contactNumber?: string; instagramProfile?: string; logoUrl?: string } | null | undefined;
   }): Promise<{ imageUrl: string; prompt: string }> {
     const category = getCategoryOrDefault(data.businessType);
     const template = getTemplateOrDefault(category, data.templateId);
@@ -115,6 +120,9 @@ export class PostGeneratorService {
           price: data.productPrice,
           dimension: "1:1",
           productImages: productImagesJson,
+          contactNumber: data.userProfile?.contactNumber,
+          instagramProfile: data.userProfile?.instagramProfile,
+          logoUrl: data.userProfile?.logoUrl,
         },
         { timeout: 120000 }
       );
@@ -134,7 +142,8 @@ export class PostGeneratorService {
     const finalPrompt = buildExactGeradorPostsPrompt(
       template.basePrompt,
       data.productTitle,
-      data.productPrice
+      data.productPrice,
+      data.userProfile
     );
 
     console.log(`[PostGeneratorService] Solicitando geração de imagem com o modelo 'gpt-image-2' usando o prompt oficial do template '${template.title}'...`);

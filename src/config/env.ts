@@ -21,5 +21,10 @@ export const env = {
   openaiApiKey: requiredEnvVars.OPENAI_API_KEY,
   openaiModel: process.env.OPENAI_MODEL || "gpt-4o-mini",
   geradorPostsApiUrl: process.env.GERADOR_POSTS_API_URL || "http://localhost:3000",
+  supabaseUrl: process.env.SUPABASE_URL || "https://fpjcpnwiqsxhdwrxywzk.supabase.co",
+  supabaseAnonKey: process.env.SUPABASE_ANON_KEY || "sb_publishable_qd57BlrPkk7rUMY__fQB6w_pw_VFEZa",
+  chatwootUrl: process.env.CHATWOOT_URL || "https://chatwoot-8fyt-production.up.railway.app",
+  chatwootToken: process.env.CHATWOOT_ACCESS_TOKEN || process.env.SEGREDO_WEBHOOK_CHATWOOT || "",
+  chatwootWebhookSecret: process.env.SEGREDO_WEBHOOK_CHATWOOT || "",
   port: Number(process.env.PORT) || 3333,
 } as const;

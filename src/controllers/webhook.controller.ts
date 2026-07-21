@@ -11,9 +11,9 @@ import { AIService } from "../services/ai.service.js";
 import { MessageService } from "../services/message.service.js";
 import { PostGeneratorService } from "../services/post-generator.service.js";
 import { PostFlowService } from "../services/post-flow.service.js";
+import { SupabaseProfileService } from "../services/supabase-profile.service.js";
 import { OpenAIProvider } from "../integrations/openai/openai.client.js";
 import { parseIncomingMessage } from "../dto/incoming-message.dto.js";
-import type { WhatsAppWebhookPayload } from "../types/whatsapp.types.js";
 
 export class WebhookController {
   private readonly messageService: MessageService;
@@ -25,10 +25,11 @@ export class WebhookController {
     const messageRepository = new MessageRepository();
     const postSessionRepository = new PostSessionRepository();
 
-    // 2. Inicialização dos Services de domínio
+    // 2. Inicialização dos Services de domínio e Supabase
     const contactService = new ContactService(contactRepository);
     const conversationService = new ConversationService(conversationRepository, messageRepository);
     const whatsappService = new WhatsAppService();
+    const supabaseProfileService = new SupabaseProfileService();
 
     // 3. Inicialização da Integração de IA e Gerador de Posts
     const openAIProvider = new OpenAIProvider();
@@ -48,20 +49,20 @@ export class WebhookController {
       messageRepository,
       whatsappService,
       aiService,
-      postFlowService
+      postFlowService,
+      supabaseProfileService
     );
   }
 
   /**
    * GET /webhook
-   * Realiza a validação do webhook exigida pela Meta (handshake inicial)
+   * Handshake oficial Meta / Validação simples de status
    */
   verifyWebhook = async (
     request: FastifyRequest<{ Querystring: Record<string, string> }>,
     reply: FastifyReply
   ) => {
     const query = request.query;
-
     const mode = query["hub.mode"];
     const token = query["hub.verify_token"];
     const challenge = query["hub.challenge"];
@@ -70,71 +71,143 @@ export class WebhookController {
 
     if (mode === "subscribe" && token === env.verifyToken) {
       request.log.info("Webhook validado com sucesso!");
-      return reply
-        .status(200)
-        .type("text/plain")
-        .send(challenge);
+      return reply.status(200).type("text/plain").send(challenge);
     }
 
-    request.log.warn("Falha na validação do webhook: Token ou Mode inválido");
     return reply.status(403).send("Token de validação inválido");
   };
 
   /**
    * POST /webhook
-   * Recebe e processa as mensagens e eventos enviados pela Meta
+   * Processa tanto requisições diretas da Meta quanto os Webhooks do Chatwoot
    */
   receiveMessage = async (
-    request: FastifyRequest<{ Body: WhatsAppWebhookPayload }>,
+    request: FastifyRequest<{ Body: any }>,
     reply: FastifyReply
   ) => {
-    const body = request.body;
+    const body = request.body as any;
 
     request.log.debug({ body }, "Evento recebido no webhook");
 
-    if (body.object !== "whatsapp_business_account" || !body.entry) {
-      return reply.status(400).send("Payload inválido para webhook WhatsApp");
-    }
-
     try {
-      const changeValue = body.entry?.[0]?.changes?.[0]?.value;
-      const incomingPhoneNumberId = changeValue?.metadata?.phone_number_id;
+      // -------------------------------------------------------------
+      // FLUXO 1: WEBHOOK DO CHATWOOT
+      // -------------------------------------------------------------
+      if (body.event === "message_created" || body.event === "conversation_updated") {
+        // Processa apenas mensagens vindas do cliente (incoming) e não privadas
+        if (body.message_type === "incoming" && !body.private) {
+          const userMessage = body.content || "";
+          const conversationId = body.conversation?.id;
+          const accountId = body.account?.id;
+          const senderPhone = body.sender?.phone_number || body.conversation?.meta?.sender?.phone_number || "";
 
-      // 1. Processar novas mensagens de entrada usando os DTOs
-      if (changeValue?.messages && changeValue.messages.length > 0) {
-        const incomingMessages = parseIncomingMessage(body);
-        
-        for (const incomingMsg of incomingMessages) {
-          // Validar se o phone_number_id da mensagem corresponde ao configurado
-          if (incomingMsg.phoneNumberId !== env.phoneNumberId) {
-            request.log.info(
-              `Mensagem ignorada: phone_number_id recebido (${incomingMsg.phoneNumberId}) não corresponde ao configurado (${env.phoneNumberId})`
-            );
-            continue;
-          }
-          await this.messageService.handleIncomingMessage(incomingMsg);
-        }
-      }
-
-      // 2. Processar atualizações de status de entrega de mensagens enviadas
-      if (changeValue?.statuses && changeValue.statuses.length > 0) {
-        if (incomingPhoneNumberId && incomingPhoneNumberId !== env.phoneNumberId) {
           request.log.info(
-            `Atualização de status ignorada: phone_number_id recebido (${incomingPhoneNumberId}) não corresponde ao configurado (${env.phoneNumberId})`
+            { conversationId, senderPhone, userMessage },
+            "Mensagem do Chatwoot identificada para processamento"
           );
-        } else {
-          for (const statusUpdate of changeValue.statuses) {
-            await this.messageService.handleStatusUpdate(statusUpdate.id, statusUpdate.status);
+
+          let msgType: "text" | "image" | "document" | "audio" | "video" | "other" = "text";
+          let mediaUrl: string | undefined = undefined;
+          let caption: string | undefined = undefined;
+
+          if (body.attachments && body.attachments.length > 0) {
+            const attachment = body.attachments[0];
+            if (attachment.file_type === "image" || attachment.data_url?.match(/\.(jpg|jpeg|png|webp)/i)) {
+              msgType = "image";
+              mediaUrl = attachment.data_url;
+              caption = userMessage;
+            }
           }
+
+          // Cria um objeto DTO normalizado para o MessageService
+          const normalizedMsg = {
+            senderPhone: senderPhone.replace(/^\+/, ""),
+            senderName: body.sender?.name || "Cliente",
+            messageId: body.id ? String(body.id) : `cw_${Date.now()}`,
+            timestamp: new Date(),
+            type: msgType,
+            body: userMessage || (msgType === "image" ? "[Imagem]" : ""),
+            phoneNumberId: env.phoneNumberId,
+            chatwootAccountId: accountId,
+            chatwootConversationId: conversationId,
+            mediaUrl,
+            caption,
+          };
+
+          // Encaminha para o serviço que irá consultar o Supabase e a OpenAI
+          await this.messageService.handleIncomingMessage(normalizedMsg as any);
         }
+
+        return reply.status(200).send({ status: "EVENT_RECEIVED" });
       }
 
-      return reply.status(200).send("EVENT_RECEIVED");
+      // -------------------------------------------------------------
+      // FLUXO 2: WEBHOOK DIRETO DA META (Legado / Backup)
+      // -------------------------------------------------------------
+      if (body.object === "whatsapp_business_account" && body.entry) {
+        const changeValue = body.entry?.[0]?.changes?.[0]?.value;
+
+        if (changeValue?.messages && changeValue.messages.length > 0) {
+          const incomingMessages = parseIncomingMessage(body);
+
+          for (const incomingMsg of incomingMessages) {
+            if (incomingMsg.phoneNumberId !== env.phoneNumberId) {
+              continue;
+            }
+            await this.messageService.handleIncomingMessage(incomingMsg);
+          }
+        }
+
+        return reply.status(200).send("EVENT_RECEIVED");
+      }
+
+      // Se não for nem Chatwoot nem Meta oficial
+      return reply.status(400).send("Formato de payload não reconhecido");
+
     } catch (error) {
-      request.log.error(error, "Erro no fluxo principal do webhook controller");
-      
-      // Retorna 200 para evitar retentativas infinitas da API da Meta que travam o processamento
-      return reply.status(200).send("EVENT_RECEIVED_WITH_ERRORS");
+      request.log.error(error, "Erro no processamento do webhook");
+      return reply.status(200).send({ status: "EVENT_RECEIVED_WITH_ERRORS" });
     }
   };
+}
+
+/**
+ * Função utilitária exportada para enviar mensagens de resposta de volta ao Chatwoot
+ */
+export async function sendChatwootMessage(
+  accountId: number | string,
+  conversationId: number | string,
+  text: string
+) {
+  const chatwootUrl = env.chatwootUrl;
+  const chatwootToken = env.chatwootToken;
+
+  if (!chatwootUrl || !chatwootToken) {
+    console.warn("[Chatwoot] CHATWOOT_URL ou CHATWOOT_ACCESS_TOKEN não configurado.");
+    return;
+  }
+
+  try {
+    const res = await fetch(`${chatwootUrl}/api/v1/accounts/${accountId}/conversations/${conversationId}/messages`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "api_access_token": chatwootToken,
+      },
+      body: JSON.stringify({
+        content: text,
+        message_type: "outgoing",
+        private: false,
+      }),
+    });
+
+    if (!res.ok) {
+      const errText = await res.text();
+      console.error(`[Chatwoot] Erro ao enviar mensagem para Chatwoot (${res.status}): ${errText}`);
+    } else {
+      console.log(`[Chatwoot] Mensagem despachada com SUCESSO para conversa ${conversationId} no Chatwoot.`);
+    }
+  } catch (err: any) {
+    console.error(`[Chatwoot] Exceção ao conectar no Chatwoot:`, err.message || err);
+  }
 }
