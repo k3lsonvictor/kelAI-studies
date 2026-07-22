@@ -215,7 +215,7 @@ export class PostGeneratorService {
             productName: data.productTitle,
             price: data.productPrice,
             description: data.extraContext,
-            dimension: "1:1",
+            dimension: "3:4",
             hasHumanModel: Boolean(data.hasHumanModel),
             humanModelGender: data.humanModelGender || "woman",
             postType: data.postType || "produto",
