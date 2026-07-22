@@ -332,7 +332,7 @@ export class PostFlowService {
 
         await this.sendBusinessTypePrompt(
           senderPhone,
-          "Olá! 🚀 Bem-vindo ao Gerador de Posts kel-IA!\n\nQual é o segmento/nicho do seu negócio?",
+          "Olá! 🚀 Bem-vindo ao Gerador de Posts Promto!\n\nQual é o segmento/nicho do seu negócio?",
           cwCtx
         );
         return true;
@@ -552,12 +552,10 @@ export class PostFlowService {
           productImage: null,
         });
 
-        let fastMsg = "⚡ *Modo Post Rápido Ativado!*\n\n";
-        fastMsg += "Por favor, me envie agora a *Foto do Produto* e escreva na legenda da foto o **Nome** e o **Preço** (você também pode incluir uma descrição ou contexto comercial do seu negócio!).\n\n";
-        fastMsg += "💡 *Dica:* Se NÃO quiser mostrar o preço no post (*Post de Desejo*), digite apenas o Nome do Produto!\n\n";
-        fastMsg += "• *Exemplo com Preço:* Bolo de Cenoura R$ 15,00\n";
-        fastMsg += "• *Exemplo de Desejo:* Bolo de Cenoura\n";
-        fastMsg += "• *Exemplo com Contexto:* Venha encomendar seu delicioso pudim na Padaria Pão Nosso";
+        let fastMsg = "⚡ *Modo Post Rápido!*\n\n";
+        fastMsg += "📸 **Envie a foto do produto** e escreva na legenda o **Nome** e **Preço**!\n\n";
+        fastMsg += "• *Com preço:* Bolo de Cenoura R$ 15,00\n";
+        fastMsg += "• *Sem preço (Desejo):* Bolo de Cenoura";
         await this.whatsappService.sendText(senderPhone, fastMsg, cwCtx);
         return true;
       } else {
@@ -726,22 +724,11 @@ export class PostFlowService {
 
       const isWish = !price || price === "Consulte" || price.toLowerCase().includes("desejo") || price.toLowerCase().includes("sem preço");
 
-      let confirmMsg = "Recebido!\n\n";
-      confirmMsg += "Identifiquei:\n";
+      let confirmMsg = "Recebido! ⚙️\n\n";
       confirmMsg += `🏷️ *Produto:* ${title}\n`;
-      if (isWish) {
-        confirmMsg += `✨ *Tipo:* Post de Desejo (sem preço numérico)\n`;
-      } else {
-        confirmMsg += `💰 *Preço:* ${price}\n`;
-      }
-      confirmMsg += `📌 *Tipo de Post:* ${postTypeDisplay}\n`;
-      if (extraContext) {
-        confirmMsg += `📝 *Legenda/Contexto:* ${extraContext}\n`;
-      }
-      if (session.colors) {
-        confirmMsg += `🎨 *Cores:* ${session.colors}\n`;
-      }
-      confirmMsg += "\n⚡ *Nossa IA de alta precisão está criando seu design do zero. Em menos de 60 segundos você terá uma arte que levaria 1 hora no Canva!* ⚙️";
+      confirmMsg += isWish ? `✨ *Tipo:* Post de Desejo\n` : `💰 *Preço:* ${price}\n`;
+      if (extraContext) confirmMsg += `📝 *Contexto:* ${extraContext}\n`;
+      confirmMsg += "\n⚡ *Criando sua arte em menos de 60s...*";
 
       await this.whatsappService.sendText(senderPhone, confirmMsg, cwCtx);
 
@@ -976,7 +963,7 @@ export class PostFlowService {
       console.warn(`[PostFlowService] Usuário ${senderPhone} tentou gerar arte sem créditos suficientes (saldo: ${userProfile.credits}).`);
 
       const noCreditsMsg = userProfile.isTrial
-        ? "⚠️ *Seus 3 créditos de teste grátis acabaram!* 🚀\n\nEspero que tenha gostado das artes que criamos juntos! 🔥\n\nPara continuar criando artes ilimitadas em segundos com a nossa IA, entre em contato com o nosso suporte para assinar um de nossos planos! 💳✨"
+        ? "⚠️ *Seus 3 testes grátis acabaram!* 🚀\n\nGostou do resultado? 🔥\n\nPara continuar criando artes ilimitadas com o Promto, fale com nosso suporte e escolha seu plano! 💳✨"
         : "⚠️ *Seus créditos de geração de artes acabaram!*\n\nEntre em contato com o suporte para renovar seu plano e continuar criando artes incríveis em segundos! 🚀";
 
       await this.whatsappService.sendText(senderPhone, noCreditsMsg, cwCtx);
@@ -1044,7 +1031,7 @@ export class PostFlowService {
 
       if (userProfile && typeof userProfile.credits === "number") {
         finalDeliveryMsg += userProfile.isTrial
-          ? `💳 *Créditos de Teste restantes:* ${userProfile.credits} post(s)\n\n`
+          ? `💳 *Testes restantes:* ${userProfile.credits} de 3\n\n`
           : `💳 *Créditos disponíveis:* ${userProfile.credits} post(s)\n\n`;
       }
 

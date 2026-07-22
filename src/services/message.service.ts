@@ -89,15 +89,11 @@ export class MessageService {
         if (userProfile.isTrial && userProfile.isFirstWelcome) {
           console.log(`[MessageService] Enviando mensagem de apresentação / boas-vindas para usuário Trial ${incomingDto.senderPhone}`);
 
-          let welcomeMsg = `🤖 *Olá! Eu sou a sua IA Designer de Posts para Redes Sociais!* ✨\n\n`;
-          welcomeMsg += `Eu crio artes e designs profissionais incríveis para os seus produtos em menos de 60 segundos — com qualidade de agência que levaria mais de 1 hora no Canva! 🎨⚡\n\n`;
-          welcomeMsg += `*Como eu funciono:*\n`;
-          welcomeMsg += `1️⃣ Você me envia a *Foto do seu produto*\n`;
-          welcomeMsg += `2️⃣ Digita o *Nome e o Preço* (ou contexto/descrição) na legenda da foto\n`;
-          welcomeMsg += `3️⃣ Eu crio a sua arte pronta em alta resolução (1080x1440) com a melhor identidade visual!\n\n`;
-          welcomeMsg += `🎁 *Para você testar na prática sem compromisso, acabei de liberar 3 CRÉDITOS GRÁTIS no seu número!* 💳 (Você tem 3 postagens gratuitas).\n\n`;
-          welcomeMsg += `Vamos criar sua primeira arte agora? 🚀\n`;
-          welcomeMsg += `Por favor, me envie a *Foto do seu Produto* e escreva na legenda o **Nome** e o **Preço**!`;
+          let welcomeMsg = `Olá! 🚀 Bem-vindo ao **Promto**!\n\n`;
+          welcomeMsg += `Transformo fotos de produtos em artes profissionais em menos de 60s! 🎨✨\n\n`;
+          welcomeMsg += `🎁 *Você ganhou 3 testes grátis!*\n\n`;
+          welcomeMsg += `📸 **Envie agora a foto do produto** e escreva na legenda o **Nome** e **Preço**!\n`;
+          welcomeMsg += `*(Ex: Bolo de Cenoura R$ 15,00)*`;
 
           await this.whatsappService.sendText(incomingDto.senderPhone, welcomeMsg);
           if (userProfile.id) {
