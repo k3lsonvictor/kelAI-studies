@@ -94,3 +94,14 @@ model PostSession {
 
   @@map("post_sessions")
 }
+
+model TrialUser {
+  id          String   @id @default(uuid())
+  phone       String   @unique
+  credits     Int      @default(3)
+  isWelcomed  Boolean  @default(false) @map("is_welcomed")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  @@map("trial_users")
+}

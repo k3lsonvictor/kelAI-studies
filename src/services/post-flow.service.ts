@@ -54,7 +54,7 @@ export class PostFlowService {
     private readonly postGeneratorService: PostGeneratorService,
     private readonly aiService?: AIService,
     private readonly supabaseProfileService?: SupabaseProfileService
-  ) {}
+  ) { }
 
   /**
    * Wrapper privado para atualizar a sessão incluindo e persistindo o contexto do Chatwoot
@@ -726,7 +726,7 @@ export class PostFlowService {
 
       const isWish = !price || price === "Consulte" || price.toLowerCase().includes("desejo") || price.toLowerCase().includes("sem preço");
 
-      let confirmMsg = "Recebido! 🧀\n\n";
+      let confirmMsg = "Recebido!\n\n";
       confirmMsg += "Identifiquei:\n";
       confirmMsg += `🏷️ *Produto:* ${title}\n`;
       if (isWish) {
@@ -921,7 +921,7 @@ export class PostFlowService {
     if (isFastPost) {
       if (category.id === "moda") {
         const titleLower = productTitle.toLowerCase();
-        
+
         if (session?.modelProfile === "kids" || titleLower.includes("infantil") || titleLower.includes("criança") || titleLower.includes("bebê") || titleLower.includes("kids")) {
           templateId = "kids";
         } else if (session?.hasHumanModel) {
@@ -974,11 +974,12 @@ export class PostFlowService {
 
     if (userProfile && typeof userProfile.credits === "number" && userProfile.credits <= 0) {
       console.warn(`[PostFlowService] Usuário ${senderPhone} tentou gerar arte sem créditos suficientes (saldo: ${userProfile.credits}).`);
-      await this.whatsappService.sendText(
-        senderPhone,
-        "⚠️ *Seus créditos de geração de artes acabaram!*\n\nEntre em contato com o suporte para renovar seu plano e continuar criando artes incríveis em segundos! 🚀",
-        cwCtx
-      );
+
+      const noCreditsMsg = userProfile.isTrial
+        ? "⚠️ *Seus 3 créditos de teste grátis acabaram!* 🚀\n\nEspero que tenha gostado das artes que criamos juntos! 🔥\n\nPara continuar criando artes ilimitadas em segundos com a nossa IA, entre em contato com o nosso suporte para assinar um de nossos planos! 💳✨"
+        : "⚠️ *Seus créditos de geração de artes acabaram!*\n\nEntre em contato com o suporte para renovar seu plano e continuar criando artes incríveis em segundos! 🚀";
+
+      await this.whatsappService.sendText(senderPhone, noCreditsMsg, cwCtx);
       return;
     }
 
@@ -986,9 +987,9 @@ export class PostFlowService {
     let typingInterval: NodeJS.Timeout | null = null;
 
     if (cwCtx) {
-      this.whatsappService.sendTypingIndicator(senderPhone, cwCtx).catch(() => {});
+      this.whatsappService.sendTypingIndicator(senderPhone, cwCtx).catch(() => { });
       typingInterval = setInterval(() => {
-        this.whatsappService.sendTypingIndicator(senderPhone, cwCtx).catch(() => {});
+        this.whatsappService.sendTypingIndicator(senderPhone, cwCtx).catch(() => { });
       }, 5000);
     }
 
@@ -1019,7 +1020,7 @@ export class PostFlowService {
       // Deduz o crédito do usuário após a geração de sucesso
       if (userProfile?.id && typeof userProfile.credits === "number" && this.supabaseProfileService) {
         try {
-          const newCredits = await this.supabaseProfileService.deductCredit(userProfile.id, userProfile.credits);
+          const newCredits = await this.supabaseProfileService.deductCredit(userProfile.id, userProfile.credits, userProfile.isTrial);
           userProfile.credits = newCredits;
         } catch (creditErr) {
           console.error(`[PostFlowService] Erro ao deduzir crédito para o usuário ${senderPhone}:`, creditErr);
@@ -1042,7 +1043,9 @@ export class PostFlowService {
       }
 
       if (userProfile && typeof userProfile.credits === "number") {
-        finalDeliveryMsg += `💳 *Créditos disponíveis:* ${userProfile.credits} post(s)\n\n`;
+        finalDeliveryMsg += userProfile.isTrial
+          ? `💳 *Créditos de Teste restantes:* ${userProfile.credits} post(s)\n\n`
+          : `💳 *Créditos disponíveis:* ${userProfile.credits} post(s)\n\n`;
       }
 
       finalDeliveryMsg += "Escolha uma das opções abaixo para prosseguir:";
@@ -1069,7 +1072,7 @@ export class PostFlowService {
         clearInterval(typingInterval);
       }
       if (cwCtx) {
-        this.whatsappService.stopTypingIndicator(senderPhone, cwCtx).catch(() => {});
+        this.whatsappService.stopTypingIndicator(senderPhone, cwCtx).catch(() => { });
       }
 
       // Redefine apenas o step preservando as informações para possibilitar o "Gerar Novamente"
