@@ -570,23 +570,40 @@ export class PostFlowService {
       }
     }
 
-    // --- PASSO 4 (Custom): Seleção de Template ➔ Validação estrita ---
+    // --- PASSO 4 (Custom): Seleção de Template ➔ Validação flexível (Número, ID ou Título do Botão/Lista) ---
     if (session.step === PostStep.SELECT_TEMPLATE) {
       const category = getCategoryOrDefault(session.businessType);
       const index = parseInt(cleanText, 10);
 
-      if (isNaN(index) || index < 1 || index > category.templates.length) {
+      let selectedTemplate = null;
+
+      // 1. Tenta correspondência por número (1, 2, 3...)
+      if (!isNaN(index) && index >= 1 && index <= category.templates.length) {
+        selectedTemplate = category.templates[index - 1];
+      }
+
+      // 2. Se não encontrou por número, busca por ID ou Título do template (clique no botão/lista)
+      if (!selectedTemplate) {
+        selectedTemplate = category.templates.find((tmpl) => {
+          const idLower = tmpl.id.toLowerCase();
+          const titleLower = tmpl.title.toLowerCase();
+          return (
+            cleanLower === idLower ||
+            cleanLower === titleLower ||
+            cleanLower.includes(titleLower) ||
+            titleLower.includes(cleanLower) ||
+            cleanLower.includes(idLower)
+          );
+        });
+      }
+
+      if (!selectedTemplate) {
         await this.whatsappService.sendText(
           senderPhone,
-          `⚠️ Opção inválida. Por favor, escolha um número de template válido (de 1 a ${category.templates.length}).`,
+          `⚠️ Opção inválida. Por favor, selecione um dos templates da lista acima ou digite o número (de 1 a ${category.templates.length}).`,
           cwCtx
         );
         await this.sendTemplatesMenu(contactId, senderPhone, session.businessType, cwCtx);
-        return true;
-      }
-
-      const selectedTemplate = category.templates[index - 1];
-      if (!selectedTemplate) {
         return true;
       }
 
