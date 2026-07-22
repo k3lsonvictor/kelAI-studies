@@ -76,7 +76,7 @@ function buildExactGeradorPostsPrompt(
   basePrompt: string,
   productName: string,
   price: string,
-  userProfile?: { contactNumber?: string; instagramProfile?: string; logoUrl?: string } | null,
+  userProfile?: { contactNumber?: string; instagramProfile?: string; logoUrl?: string; primaryColor?: string; secondaryColor?: string } | null,
   colors?: string | null,
   hasHumanModel?: boolean | null,
   humanModelGender?: string | null,
@@ -102,13 +102,18 @@ function buildExactGeradorPostsPrompt(
   prompt = prompt.replace("{{price}}", priceText);
   prompt = prompt.replace("{{cta}}", "Não fornecido (NÃO inclua nenhum botão de CTA)");
 
-  if (colors && colors.trim()) {
-    prompt = prompt.replace("{{primary_color}}", `Use preferencialmente estas cores especificadas pelo usuário: ${colors.trim()}`);
-    prompt = prompt.replace("{{secondary_color}}", "Use cores complementares harmoniosas com as especificadas.");
-  } else {
-    prompt = prompt.replace("{{primary_color}}", "#4f46e5");
-    prompt = prompt.replace("{{secondary_color}}", "#f59e0b");
-  }
+  const primaryColor = (colors && colors.trim())
+    ? `Use preferencialmente estas cores especificadas pelo usuário: ${colors.trim()}`
+    : (userProfile?.primaryColor && userProfile.primaryColor.trim())
+    ? userProfile.primaryColor.trim()
+    : "#4f46e5";
+
+  const secondaryColor = (userProfile?.secondaryColor && userProfile.secondaryColor.trim())
+    ? userProfile.secondaryColor.trim()
+    : "#f59e0b";
+
+  prompt = prompt.replace("{{primary_color}}", primaryColor);
+  prompt = prompt.replace("{{secondary_color}}", secondaryColor);
 
   prompt = prompt.replace("{{product_description}}", `Use o produto como o elemento principal da composição.`);
 
@@ -167,7 +172,7 @@ export class PostGeneratorService {
     humanModelGender?: string | null | undefined;
     postType?: string | null | undefined;
     productImage?: string | null | undefined;
-    userProfile?: { contactNumber?: string; instagramProfile?: string; logoUrl?: string } | null | undefined;
+    userProfile?: { contactNumber?: string; instagramProfile?: string; logoUrl?: string; primaryColor?: string; secondaryColor?: string } | null | undefined;
     colors?: string | null | undefined;
     extraContext?: string | null | undefined;
   }): Promise<{ imageUrl: string; prompt: string }> {
@@ -185,6 +190,18 @@ export class PostGeneratorService {
     if (data.extraContext) {
       console.log(`[PostGeneratorService] Contexto extra da legenda: "${data.extraContext}"`);
     }
+
+    const primaryColor = (data.colors && data.colors.trim())
+      ? data.colors.trim()
+      : (data.userProfile?.primaryColor && data.userProfile.primaryColor.trim())
+      ? data.userProfile.primaryColor.trim()
+      : "#4f46e5";
+
+    const secondaryColor = (data.userProfile?.secondaryColor && data.userProfile.secondaryColor.trim())
+      ? data.userProfile.secondaryColor.trim()
+      : "#f59e0b";
+
+    console.log(`[PostGeneratorService] Cores da Marca -> Primária: "${primaryColor}" | Secundária: "${secondaryColor}"`);
 
     // 1. Tentar gerar através da API da aplicação gerador-posts-ia (que usa gpt-image-2 e os prompts oficiais)
     if (env.geradorPostsApiUrl && !env.geradorPostsApiUrl.includes("localhost")) {
@@ -206,7 +223,8 @@ export class PostGeneratorService {
             contactNumber: data.userProfile?.contactNumber,
             instagramProfile: data.userProfile?.instagramProfile,
             logoUrl: data.userProfile?.logoUrl,
-            primaryColor: data.colors || "#4f46e5",
+            primaryColor,
+            secondaryColor,
           },
           { timeout: 120000 }
         );
