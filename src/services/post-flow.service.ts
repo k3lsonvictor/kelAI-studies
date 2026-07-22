@@ -916,8 +916,9 @@ export class PostFlowService {
     const productPrice = session?.productPrice || "R$ 149,90";
     const productImage = session?.productImage || null;
 
-    // Se for Post Rápido (usando placeholder "food-promo" ou sem template definido), escolhe o melhor template dinamicamente
-    if (templateId === "food-promo" || !templateId) {
+    // Se for Post Rápido ou se não houve seleção manual de template no menu customizado, escolhe o melhor template dinamicamente
+    const isFastPost = !session?.step || session.step === PostStep.INPUT_IMAGE || templateId === "food-promo" || templateId === "quick" || templateId === "luxury-single-oval-light" || !templateId;
+    if (isFastPost) {
       if (category.id === "moda") {
         const titleLower = productTitle.toLowerCase();
         
@@ -929,12 +930,11 @@ export class PostFlowService {
           } else {
             templateId = "fashion"; // Feminino: Fashion (Zara style)
           }
-        } else if (titleLower.includes("florido") || titleLower.includes("vestido") || titleLower.includes("saia") || titleLower.includes("estampado") || titleLower.includes("leve") || titleLower.includes("linho") || titleLower.includes("seda") || titleLower.includes("floral") || titleLower.includes("colorido")) {
-          templateId = "luxury-single-oval-light"; // Light, elegant off-white/creme
-        } else if (titleLower.includes("streetwear") || titleLower.includes("moletom") || titleLower.includes("jaqueta") || titleLower.includes("tênis") || titleLower.includes("tenis") || titleLower.includes("boné") || titleLower.includes("bone")) {
-          templateId = "streetwear"; // Streetwear style
         } else {
-          templateId = "fashion"; // Zara minimal, light/clean fashion template
+          // Post Rápido de moda sem modelo de IA (usando foto original):
+          // Alterna aleatoriamente entre os dois templates principais de moda: "fashion" e "dark-fashion"
+          const fashionTemplates = ["fashion", "dark-fashion"];
+          templateId = fashionTemplates[Math.floor(Math.random() * fashionTemplates.length)];
         }
       } else if (category.id === "gastronomia") {
         const titleLower = productTitle.toLowerCase();
@@ -970,6 +970,16 @@ export class PostFlowService {
         userProfile = auth.profile;
         console.log(`[PostFlowService] Perfil do Supabase obtido no momento da geração para ${senderPhone}. Instagram: "${userProfile.instagramProfile}"`);
       }
+    }
+
+    if (userProfile && typeof userProfile.credits === "number" && userProfile.credits <= 0) {
+      console.warn(`[PostFlowService] Usuário ${senderPhone} tentou gerar arte sem créditos suficientes (saldo: ${userProfile.credits}).`);
+      await this.whatsappService.sendText(
+        senderPhone,
+        "⚠️ *Seus créditos de geração de artes acabaram!*\n\nEntre em contato com o suporte para renovar seu plano e continuar criando artes incríveis em segundos! 🚀",
+        cwCtx
+      );
+      return;
     }
 
     let success = false;
