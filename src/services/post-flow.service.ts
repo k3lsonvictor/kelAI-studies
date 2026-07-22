@@ -553,10 +553,11 @@ export class PostFlowService {
         });
 
         let fastMsg = "⚡ *Modo Post Rápido Ativado!*\n\n";
-        fastMsg += "Por favor, me envie agora a *Foto do Produto* e escreva na legenda da foto o **Nome** e o **Preço**.\n\n";
+        fastMsg += "Por favor, me envie agora a *Foto do Produto* e escreva na legenda da foto o **Nome** e o **Preço** (você também pode incluir uma descrição ou contexto comercial do seu negócio!).\n\n";
         fastMsg += "💡 *Dica:* Se NÃO quiser mostrar o preço no post (*Post de Desejo*), digite apenas o Nome do Produto!\n\n";
         fastMsg += "• *Exemplo com Preço:* Bolo de Cenoura R$ 15,00\n";
-        fastMsg += "• *Exemplo de Desejo:* Bolo de Cenoura";
+        fastMsg += "• *Exemplo de Desejo:* Bolo de Cenoura\n";
+        fastMsg += "• *Exemplo com Contexto:* Venha encomendar seu delicioso pudim na Padaria Pão Nosso";
         await this.whatsappService.sendText(senderPhone, fastMsg, cwCtx);
         return true;
       } else {
@@ -629,10 +630,11 @@ export class PostFlowService {
       } else {
         imageMsg += "Cores definidas: *Automáticas (IA)* 🎨\n\n";
       }
-      imageMsg += "Por favor, me envie agora a *Foto do Produto* e escreva na legenda da foto o **Nome** e o **Preço**.\n\n";
+      imageMsg += "Por favor, me envie agora a *Foto do Produto* e escreva na legenda da foto o **Nome** e o **Preço** (você também pode incluir uma descrição ou contexto comercial do seu negócio!).\n\n";
       imageMsg += "💡 *Dica:* Se NÃO quiser mostrar o preço no post (*Post de Desejo*), digite apenas o Nome do Produto!\n\n";
       imageMsg += "• *Exemplo com Preço:* Bolo de Cenoura R$ 15,00\n";
-      imageMsg += "• *Exemplo de Desejo:* Bolo de Cenoura\n\n";
+      imageMsg += "• *Exemplo de Desejo:* Bolo de Cenoura\n";
+      imageMsg += "• *Exemplo com Contexto:* Venha encomendar seu delicioso pudim na Padaria Pão Nosso\n\n";
       imageMsg += '_(Se preferir criar a arte do zero sem foto, digite *"pular"*)_';
 
       await this.whatsappService.sendText(senderPhone, imageMsg, cwCtx);
@@ -673,10 +675,11 @@ export class PostFlowService {
 
       let title = session.productTitle;
       let price = session.productPrice;
+      let extraContext: string | undefined = session.extraContext || undefined;
 
-      if (!title || !price) {
-        const hasCaption = rawCaption.length > 0 && rawCaption !== "[Imagem]";
+      const hasCaption = rawCaption.length > 0 && rawCaption !== "[Imagem]";
 
+      if (hasCaption || !title || !price) {
         if (!hasCaption) {
           if (isNewImage) {
             let requestTextMsg = "📸 *Foto do Produto Recebida!*\n\n";
@@ -696,18 +699,18 @@ export class PostFlowService {
             await this.whatsappService.sendText(senderPhone, promptMsg, cwCtx);
             return true;
           }
-        }
-
-        let extractedData: { title: string; price: string; extraContext?: string };
-        if (this.aiService) {
-          extractedData = await this.aiService.extractTitleAndPrice(rawCaption);
         } else {
-          extractedData = parseTitleAndPriceRegex(rawCaption);
-        }
+          let extractedData: { title: string; price: string; extraContext?: string };
+          if (this.aiService) {
+            extractedData = await this.aiService.extractTitleAndPrice(rawCaption);
+          } else {
+            extractedData = parseTitleAndPriceRegex(rawCaption);
+          }
 
-        title = extractedData.title;
-        price = extractedData.price;
-        var extraContext = extractedData.extraContext || (hasCaption ? rawCaption : undefined);
+          title = extractedData.title;
+          price = extractedData.price;
+          extraContext = extractedData.extraContext || rawCaption;
+        }
       }
 
       const nichoDisplay = getNichoDisplayName(session.businessType);
@@ -732,6 +735,9 @@ export class PostFlowService {
         confirmMsg += `💰 *Preço:* ${price}\n`;
       }
       confirmMsg += `📌 *Tipo de Post:* ${postTypeDisplay}\n`;
+      if (extraContext) {
+        confirmMsg += `📝 *Legenda/Contexto:* ${extraContext}\n`;
+      }
       if (session.colors) {
         confirmMsg += `🎨 *Cores:* ${session.colors}\n`;
       }
