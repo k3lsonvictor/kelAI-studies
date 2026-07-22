@@ -106,11 +106,11 @@ function buildExactGeradorPostsPrompt(
     ? `Use preferencialmente estas cores especificadas pelo usuário: ${colors.trim()}`
     : (userProfile?.primaryColor && userProfile.primaryColor.trim())
     ? userProfile.primaryColor.trim()
-    : "#4f46e5";
+    : "Não especificada (ATUE COMO UM DIRETOR DE ARTE / DESIGNER SÊNIOR: escolha autonomamente uma paleta de cores altamente profissional, sofisticada e harmoniosa sob medida para o produto e seu nicho comercial).";
 
   const secondaryColor = (userProfile?.secondaryColor && userProfile.secondaryColor.trim())
     ? userProfile.secondaryColor.trim()
-    : "#f59e0b";
+    : "Não especificada (escolha uma cor secundária complementar de alto contraste).";
 
   prompt = prompt.replace("{{primary_color}}", primaryColor);
   prompt = prompt.replace("{{secondary_color}}", secondaryColor);
@@ -195,13 +195,13 @@ export class PostGeneratorService {
       ? data.colors.trim()
       : (data.userProfile?.primaryColor && data.userProfile.primaryColor.trim())
       ? data.userProfile.primaryColor.trim()
-      : "#4f46e5";
+      : undefined;
 
     const secondaryColor = (data.userProfile?.secondaryColor && data.userProfile.secondaryColor.trim())
       ? data.userProfile.secondaryColor.trim()
-      : "#f59e0b";
+      : undefined;
 
-    console.log(`[PostGeneratorService] Cores da Marca -> Primária: "${primaryColor}" | Secundária: "${secondaryColor}"`);
+    console.log(`[PostGeneratorService] Cores da Marca -> Primária: "${primaryColor || 'Automático (Designer IA)'}" | Secundária: "${secondaryColor || 'Automático (Designer IA)'}"`);
 
     // 1. Tentar gerar através da API da aplicação gerador-posts-ia (que usa gpt-image-2 e os prompts oficiais)
     if (env.geradorPostsApiUrl && !env.geradorPostsApiUrl.includes("localhost")) {
