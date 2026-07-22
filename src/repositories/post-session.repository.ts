@@ -21,6 +21,7 @@ export class PostSessionRepository {
       productTitle?: string | null;
       productPrice?: string | null;
       productImage?: string | null;
+      extraContext?: string | null;
       chatwootAccountId?: string | null;
       chatwootConversationId?: string | null;
       lastPostGeneratedAt?: Date | null;
@@ -43,6 +44,7 @@ export class PostSessionRepository {
         productTitle: data.productTitle ?? null,
         productPrice: data.productPrice ?? null,
         productImage: data.productImage ?? null,
+        extraContext: data.extraContext ?? null,
         chatwootAccountId: data.chatwootAccountId ?? null,
         chatwootConversationId: data.chatwootConversationId ?? null,
         lastPostGeneratedAt: data.lastPostGeneratedAt ?? null,
@@ -61,6 +63,7 @@ export class PostSessionRepository {
         ...(data.productTitle !== undefined && { productTitle: data.productTitle }),
         ...(data.productPrice !== undefined && { productPrice: data.productPrice }),
         ...(data.productImage !== undefined && { productImage: data.productImage }),
+        ...(data.extraContext !== undefined && { extraContext: data.extraContext }),
         ...(data.chatwootAccountId !== undefined && { chatwootAccountId: data.chatwootAccountId }),
         ...(data.chatwootConversationId !== undefined && { chatwootConversationId: data.chatwootConversationId }),
         ...(data.lastPostGeneratedAt !== undefined && { lastPostGeneratedAt: data.lastPostGeneratedAt }),

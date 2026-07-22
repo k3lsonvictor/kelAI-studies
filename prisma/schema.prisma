@@ -81,6 +81,7 @@ model PostSession {
   productTitle        String?  @map("product_title")
   productPrice        String?  @map("product_price")
   productImage        String?  @map("product_image")
+  extraContext        String?  @map("extra_context")
   chatwootAccountId   String?  @map("chatwoot_account_id")
   chatwootConversationId String? @map("chatwoot_conversation_id")
   lastPostGeneratedAt DateTime? @map("last_post_generated_at")

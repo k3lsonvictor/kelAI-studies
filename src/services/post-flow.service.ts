@@ -698,7 +698,7 @@ export class PostFlowService {
           }
         }
 
-        let extractedData: { title: string; price: string };
+        let extractedData: { title: string; price: string; extraContext?: string };
         if (this.aiService) {
           extractedData = await this.aiService.extractTitleAndPrice(rawCaption);
         } else {
@@ -707,6 +707,7 @@ export class PostFlowService {
 
         title = extractedData.title;
         price = extractedData.price;
+        var extraContext = extractedData.extraContext || (hasCaption ? rawCaption : undefined);
       }
 
       const nichoDisplay = getNichoDisplayName(session.businessType);
@@ -717,6 +718,7 @@ export class PostFlowService {
         productTitle: title,
         productPrice: price,
         productImage: base64Image,
+        ...(extraContext && { extraContext }),
       });
 
       const isWish = !price || price === "Consulte" || price.toLowerCase().includes("desejo") || price.toLowerCase().includes("sem preço");
@@ -988,6 +990,7 @@ export class PostFlowService {
         productImage,
         userProfile,
         colors: session?.colors,
+        extraContext: session?.extraContext,
       });
 
       await this.whatsappService.sendImage(

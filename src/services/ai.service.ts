@@ -5,7 +5,7 @@ import type { Message } from "@prisma/client";
 /**
  * Fallback regex para extração de título e preço caso a IA falhe
  */
-export function parseTitleAndPriceRegex(text: string): { title: string; price: string } {
+export function parseTitleAndPriceRegex(text: string): { title: string; price: string; extraContext?: string } {
   const clean = text.trim();
   if (!clean || clean === "[Imagem]") {
     return { title: "Produto Especial", price: "Consulte" };
@@ -47,12 +47,14 @@ export function parseTitleAndPriceRegex(text: string): { title: string; price: s
     }
 
     const price = formattedPrices.join(" | ");
-    return { title, price };
+    return { title, price, extraContext: clean };
   }
 
+  const extraContext = clean.length > 15 ? clean : undefined;
   return {
     title: clean.charAt(0).toUpperCase() + clean.slice(1),
     price: "Consulte",
+    ...(extraContext ? { extraContext } : {}),
   };
 }
 
@@ -87,29 +89,30 @@ export class AIService {
   }
 
   /**
-   * Utiliza a IA da OpenAI para extrair com máxima precisão o título do produto e o preço
-   * a partir da legenda enviada na foto pelo usuário.
+   * Utiliza a IA da OpenAI para extrair com máxima precisão o título do produto, o preço
+   * e o contexto comercial fornecido na legenda da foto enviada pelo usuário.
    */
-  async extractTitleAndPrice(rawText: string): Promise<{ title: string; price: string }> {
+  async extractTitleAndPrice(rawText: string): Promise<{ title: string; price: string; extraContext?: string }> {
     const clean = rawText.trim();
     if (!clean || clean === "[Imagem]") {
       return { title: "Produto Especial", price: "Consulte" };
     }
 
     try {
-      console.log(`[AIService] Extraindo título e preço via IA para o texto: "${clean}"`);
+      console.log(`[AIService] Extraindo título, preço e contexto via IA para o texto: "${clean}"`);
 
       const prompt = `
 Você é um assistente especialista em e-commerce, padarias, supermercados e redes sociais.
 Analise a legenda enviada pelo cliente em um chat de WhatsApp e extraia com máxima precisão:
-1. "title": O nome/título exato do produto (ex: "Pão Francês", "Bolo de Cenoura", "Camisa Oversized"). Remova palavras conectivas residuais como "por", "no valor de", "e". Capitalize as palavras de forma elegante.
+1. "title": O nome/título exato do produto (ex: "Pão Francês", "Bolo de Cenoura", "Pudim", "Camisa Oversized"). Remova palavras conectivas residuais como "por", "no valor de", "e". Capitalize as palavras de forma elegante.
 2. "price": O valor ou TODOS os valores monetários informados com suas respectivas unidades/condições (ex: se o cliente digitou "pão frances por 18,00 o kg e 0,80 a unidade", retorne "R$ 18,00 o kg | R$ 0,80 a unidade").
    - Se houver múltiplos preços (ex: por kg e por unidade, atacado e varejo, ou no pix e no cartão), inclua TODOS na mesma string de preço separados por " | ".
    - Certifique-se de incluir o símbolo "R$" em cada valor numérico se não estiver presente.
    - Se nenhum preço foi mencionado no texto, retorne "Consulte".
+3. "extraContext": Qualquer contexto comercial ou informação adicional relevante contida na legenda que ajude a compor a descrição/copy comercial do post (ex: nome do estabelecimento ou padaria como "Panificadora Pão Nosso", instrução de encomendas como "Venha encomendar o seu pudim", detalhes de sabor, promoção ou avisos). Se a legenda contiver apenas o nome do produto e preço, retorne null.
 
 Responda ESTRITAMENTE um objeto JSON válido no formato:
-{"title": "...", "price": "..."}
+{"title": "...", "price": "...", "extraContext": "..."}
 
 Legenda do cliente:
 "${clean}"
@@ -124,10 +127,12 @@ Legenda do cliente:
       if (jsonMatch) {
         const parsed = JSON.parse(jsonMatch[0]);
         if (parsed.title) {
-          console.log(`[AIService] Dados extraídos com SUCESSO pela IA -> Título: "${parsed.title}", Preço: "${parsed.price}"`);
+          console.log(`[AIService] Dados extraídos com SUCESSO pela IA -> Título: "${parsed.title}", Preço: "${parsed.price}", Contexto: "${parsed.extraContext || ""}"`);
+          const extraContext = parsed.extraContext ? String(parsed.extraContext).trim() : undefined;
           return {
             title: String(parsed.title).trim(),
             price: parsed.price ? String(parsed.price).trim() : "Consulte",
+            ...(extraContext ? { extraContext } : {}),
           };
         }
       }

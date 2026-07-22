@@ -79,12 +79,16 @@ function buildExactGeradorPostsPrompt(
   userProfile?: { contactNumber?: string; instagramProfile?: string; logoUrl?: string } | null,
   colors?: string | null,
   hasHumanModel?: boolean | null,
-  humanModelGender?: string | null
+  humanModelGender?: string | null,
+  extraContext?: string | null
 ): string {
   let prompt = SYSTEM_PROMPT_TEMPLATE;
   prompt = prompt.replace("{{template_prompt}}", basePrompt);
   prompt = prompt.replace("{{product_name}}", productName);
-  prompt = prompt.replace("{{description}}", `Crie e inclua uma pequena descrição comercial curta, persuasiva e atraente para o produto "${productName}".`);
+  const descriptionText = extraContext && extraContext.trim()
+    ? `Legenda e contexto comercial fornecidos pelo cliente: "${extraContext.trim()}". Considere estas informações para compor o post e destacar os diferenciais do produto ou do estabelecimento.`
+    : `Crie e inclua uma pequena descrição comercial curta, persuasiva e atraente para o produto "${productName}".`;
+  prompt = prompt.replace("{{description}}", descriptionText);
   const isWishPost = !price ||
     price.trim().toLowerCase() === "consulte" ||
     price.trim().toLowerCase().includes("desejo") ||
@@ -165,6 +169,7 @@ export class PostGeneratorService {
     productImage?: string | null | undefined;
     userProfile?: { contactNumber?: string; instagramProfile?: string; logoUrl?: string } | null | undefined;
     colors?: string | null | undefined;
+    extraContext?: string | null | undefined;
   }): Promise<{ imageUrl: string; prompt: string }> {
     const category = getCategoryOrDefault(data.businessType);
     const template = getTemplateOrDefault(category, data.templateId);
@@ -177,6 +182,9 @@ export class PostGeneratorService {
 
     console.log(`[PostGeneratorService] Dados do Perfil -> Telefone: "${data.userProfile?.contactNumber || 'N/A'}" | Instagram: "${data.userProfile?.instagramProfile || 'N/A'}" | Cores Customizadas: "${data.colors || 'Padrão'}"`);
     console.log(`[PostGeneratorService] Modelo Humano -> Ativo: ${data.hasHumanModel ?? false} | Perfil: "${data.humanModelGender || 'N/A'}"`);
+    if (data.extraContext) {
+      console.log(`[PostGeneratorService] Contexto extra da legenda: "${data.extraContext}"`);
+    }
 
     // 1. Tentar gerar através da API da aplicação gerador-posts-ia (que usa gpt-image-2 e os prompts oficiais)
     if (env.geradorPostsApiUrl && !env.geradorPostsApiUrl.includes("localhost")) {
@@ -189,6 +197,7 @@ export class PostGeneratorService {
             templateId: template.id,
             productName: data.productTitle,
             price: data.productPrice,
+            description: data.extraContext,
             dimension: "1:1",
             hasHumanModel: Boolean(data.hasHumanModel),
             humanModelGender: data.humanModelGender || "woman",
@@ -222,7 +231,8 @@ export class PostGeneratorService {
       data.userProfile,
       data.colors,
       data.hasHumanModel,
-      data.humanModelGender
+      data.humanModelGender,
+      data.extraContext
     );
 
     console.log(`[PostGeneratorService] Solicitando geração de imagem com o modelo 'gpt-image-2' usando o prompt oficial do template '${template.title}'...`);
