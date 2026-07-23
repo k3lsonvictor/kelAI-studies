@@ -33,7 +33,7 @@ export class SupabaseProfileService {
   private readonly trialUserRepository: TrialUserRepository;
 
   constructor() {
-    this.client = createClient(env.supabaseUrl, env.supabaseAnonKey);
+    this.client = createClient(env.supabaseUrl, env.supabaseServiceKey || env.supabaseAnonKey);
     this.trialUserRepository = new TrialUserRepository();
   }
 
@@ -179,23 +179,37 @@ export class SupabaseProfileService {
       return this.trialUserRepository.deductCredit(profileId, currentCredits);
     }
 
-    const finalCredits = Math.max(0, currentCredits - 1);
     try {
-      console.log(`[SupabaseProfileService] Deduzindo 1 crédito do perfil Supabase ID ${profileId}. Saldo anterior: ${currentCredits} | Novo saldo: ${finalCredits}`);
+      // Re-busca os créditos mais recentes diretamente da tabela profiles do Supabase
+      const { data: profileData, error: fetchErr } = await this.client
+        .from("profiles")
+        .select("credits")
+        .eq("id", profileId)
+        .single();
 
-      const { error } = await this.client
+      const baseCredits = (!fetchErr && profileData && typeof profileData.credits === "number")
+        ? profileData.credits
+        : currentCredits;
+
+      const finalCredits = Math.max(0, baseCredits - 1);
+      console.log(`[SupabaseProfileService] Deduzindo 1 crédito do perfil Supabase ID ${profileId}. Saldo no Supabase: ${baseCredits} | Novo saldo: ${finalCredits}`);
+
+      const { data: updateData, error: updateErr } = await this.client
         .from("profiles")
         .update({ credits: finalCredits })
-        .eq("id", profileId);
+        .eq("id", profileId)
+        .select();
 
-      if (error) {
-        throw error;
+      if (updateErr) {
+        console.error(`[SupabaseProfileService] Erro no Supabase ao deduzir crédito para ID ${profileId}:`, updateErr.message || updateErr);
+        throw updateErr;
       }
 
+      console.log(`[SupabaseProfileService] Crédito deduzido com SUCESSO no Supabase para ID ${profileId}! Novo saldo: ${finalCredits}`);
       return finalCredits;
     } catch (err: any) {
       console.error(`[SupabaseProfileService] Falha ao deduzir crédito para ID ${profileId}:`, err.message || err);
-      return currentCredits;
+      return Math.max(0, currentCredits - 1);
     }
   }
 }

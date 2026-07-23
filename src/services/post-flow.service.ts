@@ -1125,13 +1125,34 @@ export class PostFlowService {
         cwCtx
       );
 
-      // Deduz o crédito do usuário após a geração de sucesso
-      if (userProfile?.id && typeof userProfile.credits === "number" && this.supabaseProfileService) {
+      // Deduz o crédito do usuário no Supabase / Trial após a geração de sucesso da imagem
+      if (this.supabaseProfileService) {
         try {
-          const newCredits = await this.supabaseProfileService.deductCredit(userProfile.id, userProfile.credits, userProfile.isTrial);
-          userProfile.credits = newCredits;
-        } catch (creditErr) {
-          console.error(`[PostFlowService] Erro ao deduzir crédito para o usuário ${senderPhone}:`, creditErr);
+          let profileId = userProfile?.id;
+          let isTrial = userProfile?.isTrial;
+          let currentCredits = userProfile?.credits ?? 1;
+
+          if (!profileId) {
+            console.log(`[PostFlowService] Consultando perfil no Supabase para deduzir crédito de ${senderPhone}...`);
+            const authResult = await this.supabaseProfileService.getProfileByPhone(senderPhone);
+            if (authResult.profile) {
+              profileId = authResult.profile.id;
+              isTrial = authResult.profile.isTrial;
+              currentCredits = authResult.profile.credits ?? 1;
+            }
+          }
+
+          if (profileId) {
+            const newCredits = await this.supabaseProfileService.deductCredit(profileId, currentCredits, isTrial);
+            if (userProfile) {
+              userProfile.credits = newCredits;
+            }
+            console.log(`[PostFlowService] Crédito DEDUZIDO com sucesso para ${senderPhone}! Saldo restante: ${newCredits}`);
+          } else {
+            console.error(`[PostFlowService] Impossível deduzir crédito: perfil não localizado para ${senderPhone}`);
+          }
+        } catch (creditErr: any) {
+          console.error(`[PostFlowService] Erro ao deduzir crédito para o usuário ${senderPhone}:`, creditErr.message || creditErr);
         }
       }
 
