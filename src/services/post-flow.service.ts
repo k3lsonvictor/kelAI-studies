@@ -1261,7 +1261,7 @@ export class PostFlowService {
       await this.whatsappService.sendImage(
         senderPhone,
         result.imageUrl,
-        `🖼️ *Arte gerada para ${productTitle}!*`,
+        `${productTitle} ${productPrice}`,
         cwCtx
       );
 
