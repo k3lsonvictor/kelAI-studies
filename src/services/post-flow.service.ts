@@ -16,6 +16,7 @@ import type { UserProfileInfo } from "./supabase-profile.service.js";
 import type { AIService } from "./ai.service.js";
 import { parseTitleAndPriceRegex } from "./ai.service.js";
 import type { SupabaseProfileService } from "./supabase-profile.service.js";
+import { FinancialIntegrationService } from "./financial-integration.service.js";
 
 /**
  * Utilitário para baixar imagem a partir de uma URL remota e converter em Base64 Data URL
@@ -48,6 +49,8 @@ function getPostTypeDisplayName(postType?: string | null): string {
 }
 
 export class PostFlowService {
+  private readonly financialIntegrationService = new FinancialIntegrationService();
+
   constructor(
     private readonly postSessionRepository: PostSessionRepository,
     private readonly whatsappService: WhatsAppService,
@@ -160,6 +163,53 @@ export class PostFlowService {
   }
 
   /**
+   * Verifica se a mensagem é um comando para ativar o modo de Gestão Financeira
+   */
+  isFinancialCommand(text: string): boolean {
+    const clean = text.trim().toLowerCase();
+    const normalized = this.normalizeInputText(text);
+    const commands = [
+      "gestao financeira",
+      "gestão financeira",
+      "gestao de financas",
+      "gestão de finanças",
+      "financas",
+      "finanças",
+      "abrir gestao financeira",
+      "abrir gestão financeira",
+      "ir para gestao financeira",
+      "ir para gestão financeira",
+      "modo gestao financeira",
+      "modo gestão financeira",
+    ];
+    return commands.some(
+      (cmd) => clean === cmd || clean.startsWith(cmd) || clean.includes(cmd) || normalized === cmd || normalized.startsWith(cmd) || normalized.includes(cmd)
+    );
+  }
+
+  /**
+   * Verifica se a mensagem é um comando para sair da Gestão Financeira e retornar ao Gerador de Posts
+   */
+  isExitFinancialCommand(text: string): boolean {
+    const clean = text.trim().toLowerCase();
+    const normalized = this.normalizeInputText(text);
+    const commands = [
+      "voltar",
+      "sair",
+      "novo post",
+      "gerar post",
+      "fazer post",
+      "sair da gestao financeira",
+      "sair da gestão financeira",
+      "sair do financeiro",
+      "menu",
+    ];
+    return commands.some(
+      (cmd) => clean === cmd || clean.startsWith(cmd) || normalized === cmd || normalized.startsWith(cmd)
+    );
+  }
+
+  /**
    * Verifica se a mensagem de entrada é um gatilho para iniciar ou reiniciar a criação de um post
    */
   isTriggerMessage(text: string, hasActiveSession: boolean): boolean {
@@ -208,6 +258,54 @@ export class PostFlowService {
     let session = await this.postSessionRepository.findByContactId(contactId);
     const hasSession = Boolean(session);
     const isTrigger = this.isTriggerMessage(cleanText, hasSession);
+
+    // --- 1. COMANDO PARA ENTRAR NO MODO GESTÃO FINANCEIRA ---
+    if (this.isFinancialCommand(cleanText)) {
+      await this.updateSession(contactId, cwCtx, {
+        step: PostStep.FINANCIAL_MODE,
+      });
+
+      const welcomeFinancialMsg =
+        `💰 *Modo Gestão Financeira Ativado!*\n\n` +
+        `Agora suas mensagens (texto, notas de voz ou fotos de recibos) serão processadas pelo assistente de controle financeiro!\n\n` +
+        `💡 *Exemplos do que você pode mandar:*\n` +
+        `• *"Vendi 5 bolos no PIX por 100 reais"*\n` +
+        `• *"Comprei farinha por 40 reais no dinheiro"*\n` +
+        `• *"Quanto eu faturei esse mês?"*\n` +
+        `• *"Tenho que pagar o fornecedor 200 reais dia 15"*\n\n` +
+        `*(Para voltar ao gerador de posts a qualquer momento, digite **'voltar'** ou **'novo post'**).*`;
+
+      await this.whatsappService.sendText(senderPhone, welcomeFinancialMsg, cwCtx);
+      return true;
+    }
+
+    // --- 2. SE JÁ ESTIVER NO MODO GESTÃO FINANCEIRA ---
+    if (session && session.step === PostStep.FINANCIAL_MODE) {
+      if (this.isExitFinancialCommand(cleanText)) {
+        await this.updateSession(contactId, cwCtx, {
+          step: PostStep.SELECT_FLOW_MODE,
+        });
+
+        const exitMsg =
+          `🎨 *Modo Gerador de Posts Reativado!*\n\n` +
+          `Você saiu do modo de finanças e voltou para a criação de artes.\n` +
+          `Digite **'novo post'** para começar a criar um post!`;
+
+        await this.whatsappService.sendText(senderPhone, exitMsg, cwCtx);
+        return true;
+      }
+
+      // Encaminha a mensagem para o serviço backend de Gestão Financeira
+      const financialResponse = await this.financialIntegrationService.processFinancialMessage({
+        phoneNumber: senderPhone,
+        userName: incomingMsg.senderName,
+        messageType: incomingMsg.type as any,
+        textBody: incomingMsg.body,
+      });
+
+      await this.whatsappService.sendText(senderPhone, financialResponse, cwCtx);
+      return true;
+    }
 
     // --- GATILHO RE-GERAÇÃO COM OUTRO TEMPLATE ---
     if (session && (cleanLower === "gerar novamente" || cleanLower === "gerar_novamente" || cleanLower.includes("gerar novamente") || cleanLower.includes("gerar_novamente"))) {

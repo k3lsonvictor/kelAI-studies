@@ -66,6 +66,7 @@ enum PostStep {
   INPUT_PRICE
   INPUT_IMAGE
   GENERATING
+  FINANCIAL_MODE
 }
 
 model PostSession {

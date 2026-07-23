@@ -27,5 +27,6 @@ export const env = {
   chatwootUrl: process.env.CHATWOOT_URL || "https://chatwoot-8fyt-production.up.railway.app",
   chatwootToken: process.env.CHATWOOT_ACCESS_TOKEN || process.env.SEGREDO_WEBHOOK_CHATWOOT || "",
   chatwootWebhookSecret: process.env.SEGREDO_WEBHOOK_CHATWOOT || "",
+  gestaoFinanceiraApiUrl: process.env.GESTAO_FINANCEIRA_API_URL || "http://localhost:3334",
   port: Number(process.env.PORT) || 3333,
 } as const;

@@ -12,6 +12,21 @@ build/
 out/
 *.tsbuildinfo
 
+# Compilações inline/locais do TypeScript (.js, .d.ts e sourcemaps no src/ e raiz)
+src/**/*.js
+src/**/*.d.ts
+src/**/*.js.map
+src/**/*.d.ts.map
+*.d.ts
+*.d.ts.map
+*.map
+prisma.config.js
+test-mode-switch.js
+
+# Rascunhos e scripts locais
+scratch/
+
+
 # Logs e Dados de Execução
 *.log
 npm-debug.log*
