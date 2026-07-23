@@ -14,6 +14,10 @@ export interface SupabaseProfileData {
   secondary_color?: string | null;
   is_approved?: boolean | null;
   credits?: number | null;
+  is_active?: boolean | null;
+  plan?: string | null;
+  plan_name?: string | null;
+  next_payment_date?: string | null;
 }
 
 export interface UserProfileInfo {
@@ -26,6 +30,9 @@ export interface UserProfileInfo {
   credits?: number;
   isTrial?: boolean;
   isFirstWelcome?: boolean;
+  isActive?: boolean;
+  plan?: string;
+  nextPaymentDate?: string;
 }
 
 export class SupabaseProfileService {
@@ -80,7 +87,29 @@ export class SupabaseProfileService {
         });
 
         if (matchedProfile) {
-          console.log(`[SupabaseProfileService] Perfil AUTORIZADO no Supabase para ${rawPhone}! ID: ${matchedProfile.id} | Instagram: "${matchedProfile.instagram_profile || 'N/A'}" | Créditos: ${matchedProfile.credits ?? 0}`);
+          const isActive = matchedProfile.is_active ?? true;
+          const plan = matchedProfile.plan || matchedProfile.plan_name || "Pro";
+          const nextPaymentDate = matchedProfile.next_payment_date || undefined;
+
+          console.log(`[SupabaseProfileService] Perfil no Supabase para ${rawPhone}! ID: ${matchedProfile.id} | Ativo: ${isActive} | Plano: ${plan} | Próximo Pagamento: ${nextPaymentDate || 'N/A'} | Créditos: ${matchedProfile.credits ?? 0}`);
+
+          if (isActive === false) {
+            console.log(`[SupabaseProfileService] Conta INATIVA no Supabase para ${rawPhone}. Acesso bloqueado.`);
+            return {
+              isAuthorized: false,
+              profile: {
+                id: matchedProfile.id,
+                contactNumber: rawPhone,
+                instagramProfile: matchedProfile.instagram_profile || "",
+                logoUrl: matchedProfile.logo_url || "",
+                credits: 0,
+                isTrial: false,
+                isActive: false,
+                plan,
+                nextPaymentDate,
+              },
+            };
+          }
 
           return {
             isAuthorized: true,
@@ -93,6 +122,9 @@ export class SupabaseProfileService {
               secondaryColor: matchedProfile.secondary_color || undefined,
               credits: matchedProfile.credits ?? 0,
               isTrial: false,
+              isActive: true,
+              plan,
+              nextPaymentDate,
             },
           };
         }
