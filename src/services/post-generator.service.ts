@@ -64,11 +64,10 @@ PRODUTO
 REGRAS OBRIGATÓRIAS
 --------------------------------------------------
 
-• Formato quadrado 1080x1080.
-• O produto deve permanecer exatamente igual ao original.
-• O produto é sempre o protagonista absoluto.
-• NUNCA invente novos produtos.
-• NUNCA desenhe, invente, simule ou adicione textos fictícios como "sua logo aqui", "sua marca", "logo", "logo da empresa", ou crie logotipos fictícios/ícones na imagem se o Logotipo da Marca for "Não fornecido". Se o Logotipo da Marca for "Não fornecido", a imagem deve ficar 100% livre e limpa de qualquer logotipo ou marca d'água corporativa fictícia.
+• REGRAS DE PRODUTO E MANEQUIM DE LOJA:
+  - O produto (a peça de roupa) deve ter seu corte, cores, estampas e tecido preservados com fidelidade.
+  - MANEQUINS DE PLÁSTICO, DE GESSO OU CABIDES NÃO SÃO O PRODUTO E NÃO SÃO PESSOAS REAIS.
+  - Quando a opção de modelo humano estiver ativa, VOCÊ DEVE OBRIGATORIAMENTE REMOVER E DELETAR O MANEQUIM DE PLÁSTICO E VESTIR A PEÇA DE ROUPA EM UMA MODELO HUMANA REAL (mulher adulta de verdade com rosto, pele e cabelos reais).
 • Insira o contato do Instagram ({{instagram_profile}}) e o WhatsApp/Telefone de contato ({{contact_number}}) de forma elegante, discreta e minimalista nas margens ou rodapé da arte, preferencialmente acompanhados de ícones correspondentes.
 `;
 
