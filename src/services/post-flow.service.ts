@@ -724,7 +724,7 @@ export class PostFlowService {
 
           title = extractedData.title;
           price = extractedData.price;
-          extraContext = extractedData.extraContext || rawCaption;
+          extraContext = extractedData.extraContext;
         }
       }
 

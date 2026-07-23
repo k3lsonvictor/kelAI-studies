@@ -47,7 +47,7 @@ export function parseTitleAndPriceRegex(text: string): { title: string; price: s
     }
 
     const price = formattedPrices.join(" | ");
-    return { title, price, extraContext: clean };
+    return { title, price };
   }
 
   const extraContext = clean.length > 15 ? clean : undefined;
@@ -127,10 +127,27 @@ Legenda do cliente:
       if (jsonMatch) {
         const parsed = JSON.parse(jsonMatch[0]);
         if (parsed.title) {
-          console.log(`[AIService] Dados extraídos com SUCESSO pela IA -> Título: "${parsed.title}", Preço: "${parsed.price}", Contexto: "${parsed.extraContext || ""}"`);
-          const extraContext = parsed.extraContext ? String(parsed.extraContext).trim() : undefined;
+          const rawCtx = parsed.extraContext ? String(parsed.extraContext).trim() : "";
+          const titleStr = String(parsed.title).trim();
+          const titleLower = titleStr.toLowerCase();
+          const rawCtxLower = rawCtx.toLowerCase();
+
+          let extraContext: string | undefined = undefined;
+          if (
+            rawCtx &&
+            rawCtxLower !== "null" &&
+            rawCtxLower !== "undefined" &&
+            rawCtxLower !== titleLower &&
+            !rawCtxLower.startsWith(titleLower) &&
+            rawCtx.length > 3
+          ) {
+            extraContext = rawCtx;
+          }
+
+          console.log(`[AIService] Dados extraídos com SUCESSO pela IA -> Título: "${titleStr}", Preço: "${parsed.price}", Contexto: "${extraContext || "Nenhum"}"`);
+
           return {
-            title: String(parsed.title).trim(),
+            title: titleStr,
             price: parsed.price ? String(parsed.price).trim() : "Consulte",
             ...(extraContext ? { extraContext } : {}),
           };
