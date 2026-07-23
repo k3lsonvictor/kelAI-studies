@@ -317,22 +317,48 @@ export class PostFlowService {
           console.error(`[PostFlowService] Erro ao baixar foto enviada no gatilho:`, err.message || err);
         }
 
+        let rawCaption = (incomingMsg.caption || incomingMsg.body || "").trim();
+        let extractedData: { title: string; price: string; extraContext?: string };
+
+        if (rawCaption.length > 0 && rawCaption !== "[Imagem]") {
+          if (this.aiService) {
+            extractedData = await this.aiService.extractTitleAndPrice(rawCaption);
+          } else {
+            extractedData = parseTitleAndPriceRegex(rawCaption);
+          }
+        } else {
+          extractedData = { title: "Produto Especial", price: "Consulte" };
+        }
+
+        const title = extractedData.title;
+        const price = extractedData.price;
+        const extraContext = extractedData.extraContext;
+
         if (hasSavedNicho) {
-          // Nicho já está salvo: Ativa o Modo Post Rápido DIRETO e gera a arte instantaneamente!
+          // Nicho já está salvo: Ativa o Modo Post Rápido DIRETO e gera a arte instantaneamente (sem recursão)!
+          const isWish = !price || price === "Consulte" || price.toLowerCase().includes("desejo") || price.toLowerCase().includes("sem preço");
+
           session = await this.updateSession(contactId, cwCtx, {
-            step: PostStep.INPUT_IMAGE,
+            step: PostStep.GENERATING,
             postType: "produto",
             templateId: "quick",
-            colors: null,
-            productTitle: null,
-            productPrice: null,
+            productTitle: title,
+            productPrice: price,
             productImage: base64Image,
+            ...(extraContext && { extraContext }),
           });
 
-          // Processa a foto e a legenda enviadas imediatamente
-          return this.handlePostFlow(contactId, incomingMsg, userProfile);
+          let confirmMsg = "Recebido! ⚙️\n\n";
+          confirmMsg += `🏷️ *Produto:* ${title}\n`;
+          confirmMsg += isWish ? `✨ *Tipo:* Post de Desejo\n` : `💰 *Preço:* ${price}\n`;
+          if (extraContext) confirmMsg += `📝 *Contexto:* ${extraContext}\n`;
+          confirmMsg += "\n⚡ *Criando sua arte em menos de 60s...*";
+
+          await this.whatsappService.sendText(senderPhone, confirmMsg, cwCtx);
+          await this.generatePostAndSend(contactId, senderPhone, userProfile, cwCtx);
+          return true;
         } else {
-          // Primeira vez com foto: salva a foto na sessão e pede o Nicho
+          // Primeira vez com foto: salva a foto e dados na sessão e pede o Nicho
           session = await this.updateSession(contactId, cwCtx, {
             step: PostStep.SELECT_BUSINESS_TYPE,
             businessType: null,
@@ -341,10 +367,10 @@ export class PostFlowService {
             postType: "produto",
             templateId: "quick",
             colors: null,
-            productTitle: null,
-            productPrice: null,
+            productTitle: title,
+            productPrice: price,
             productImage: base64Image,
-            ...(incomingMsg.body && incomingMsg.body.trim() && { extraContext: incomingMsg.body.trim() }),
+            ...(extraContext && { extraContext }),
           });
 
           await this.sendBusinessTypePrompt(
@@ -420,14 +446,26 @@ export class PostFlowService {
       }
 
       // Se a foto já foi enviada na primeira mensagem (armazenada em session.productImage):
-      if (session.productImage) {
+      if (session.productImage && session.productTitle) {
+        const title = session.productTitle;
+        const price = session.productPrice || "Consulte";
+        const extraContext = session.extraContext || undefined;
+        const isWish = !price || price === "Consulte" || price.toLowerCase().includes("desejo") || price.toLowerCase().includes("sem preço");
+
         session = await this.updateSession(contactId, cwCtx, {
-          step: PostStep.INPUT_IMAGE,
+          step: PostStep.GENERATING,
           businessType: selectedBusinessType,
         });
 
-        // Simula a mensagem da foto com a legenda enviada anteriormente para gerar a arte imediatamente
-        return this.handlePostFlow(contactId, incomingMsg, userProfile);
+        let confirmMsg = "Recebido! ⚙️\n\n";
+        confirmMsg += `🏷️ *Produto:* ${title}\n`;
+        confirmMsg += isWish ? `✨ *Tipo:* Post de Desejo\n` : `💰 *Preço:* ${price}\n`;
+        if (extraContext) confirmMsg += `📝 *Contexto:* ${extraContext}\n`;
+        confirmMsg += "\n⚡ *Criando sua arte em menos de 60s...*";
+
+        await this.whatsappService.sendText(senderPhone, confirmMsg, cwCtx);
+        await this.generatePostAndSend(contactId, senderPhone, userProfile, cwCtx);
+        return true;
       }
 
       session = await this.updateSession(contactId, cwCtx, {
