@@ -1304,12 +1304,6 @@ export class PostFlowService {
       const isWishDelivery = !productPrice || productPrice === "Consulte" || productPrice.toLowerCase().includes("desejo") || productPrice.toLowerCase().includes("sem preço");
 
       let finalDeliveryMsg = "Sua arte tá pronta! 🔥\n\n";
-      finalDeliveryMsg += "📝 *Sugestão de legenda:*\n\n";
-      if (isWishDelivery) {
-        finalDeliveryMsg += `"Saindo quentinho por aqui! Venha garantir o seu ${productTitle}. Clique no link da bio ou chame no WhatsApp e peça o seu! 😋 #${nichoHashtag} #${sanitizedTitle}"\n\n`;
-      } else {
-        finalDeliveryMsg += `"Saindo quentinho por aqui! Venha garantir o seu ${productTitle} por apenas ${productPrice}. 😋 #${nichoHashtag} #${sanitizedTitle}"\n\n`;
-      }
 
       if (userProfile && typeof userProfile.credits === "number") {
         finalDeliveryMsg += userProfile.isTrial
