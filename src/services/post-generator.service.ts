@@ -83,6 +83,31 @@ function buildExactGeradorPostsPrompt(
   extraContext?: string | null
 ): string {
   let prompt = SYSTEM_PROMPT_TEMPLATE;
+
+  if (hasHumanModel) {
+    let genderStr = "feminino (mulher adulta real em carne e osso com rosto e pele humana real)";
+    if (humanModelGender === "man") {
+      genderStr = "masculino (homem adulto real em carne e osso com rosto e pele humana real)";
+    } else if (humanModelGender === "kids" || humanModelGender === "child") {
+      genderStr = "infantil (criança / modelo infantil real em carne e osso com rosto e pele humana real)";
+    }
+
+    const supremeMannequinOverride = `
+================================================================================
+ORDEM DE PRIORIDADE MÁXIMA DE EDIÇÃO: RE-IMAGINAR ROUPA EM MODELO HUMANA IA REAL
+================================================================================
+1. A imagem de entrada (image) mostra a peça de roupa exibida em um MANEQUIM DE LOJA DE PLÁSTICO/FIBRA OU BUSTO SEM ROSTO.
+2. É ESTRITAMENTE PROIBIDO MANTER O MANEQUIM DE PLÁSTICO OU MANEQUIM SEM ROSTO NA ARTE FINAL!
+3. VOCÊ DEVE OBRIGATORIAMENTE ELIMINAR E SUBSTITUIR O MANEQUIM DE PLÁSTICO DA FOTO!
+4. CRIE UMA ARTE DE CATALOGO DE MODA COM UM(A) MODELO HUMANO(A) REAL DE IA ${genderStr} VESTINDO EXATAMENTE A MESMA PEÇA DE ROUPA DA FOTO DE ENTRADA.
+5. A modelo deve ter feições humanas reais (rosto bonito completo com olhos, boca, tom de pele humano natural e cabelos reais).
+6. Transfira com máxima fidelidade o corte, cor, estampa e tecido da roupa do manequim para o corpo da modelo humana real de IA.
+================================================================================
+
+`;
+    prompt = supremeMannequinOverride + prompt;
+  }
+
   prompt = prompt.replace("{{template_prompt}}", basePrompt);
   prompt = prompt.replace("{{product_name}}", productName);
   const descriptionText = extraContext && extraContext.trim()
