@@ -5,9 +5,26 @@ import { PostStep } from "@prisma/client";
 export class FollowUpService {
   private intervalId: NodeJS.Timeout | null = null;
   private readonly whatsappService: WhatsAppService;
+  private isPaused: boolean = true; // PAUSADO TEMPORARIAMENTE
 
   constructor() {
     this.whatsappService = new WhatsAppService();
+  }
+
+  /**
+   * Pausa o envio de follow-ups
+   */
+  pause() {
+    this.isPaused = true;
+    console.log("[FollowUpService] Follow-ups pausados.");
+  }
+
+  /**
+   * Retoma o envio de follow-ups
+   */
+  resume() {
+    this.isPaused = false;
+    console.log("[FollowUpService] Follow-ups retomados.");
   }
 
   /**
@@ -40,6 +57,11 @@ export class FollowUpService {
    * Executa a lógica de verificação de regras para envio de lembretes
    */
   async runVerification() {
+    if (this.isPaused) {
+      console.log("[FollowUpService] Serviço de Follow-up pausado temporariamente.");
+      return;
+    }
+
     const now = new Date();
 
     // 1. Regra de Horário Comercial (disparar apenas entre 08:30 e 19:30 local)
