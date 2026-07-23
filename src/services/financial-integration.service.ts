@@ -10,6 +10,12 @@ export interface ProcessFinancialMessagePayload {
   imageBase64?: string | undefined;
 }
 
+export interface ProcessFinancialMessageResponse {
+  responseText: string;
+  buttons?: Array<{ id: string; title: string }>;
+  intent?: string;
+}
+
 export class FinancialIntegrationService {
   private readonly baseUrl: string;
 
@@ -19,9 +25,9 @@ export class FinancialIntegrationService {
 
   /**
    * Encaminha a mensagem recebida pelo kel-ia para o serviço de Gestão Financeira (porta 3334)
-   * e retorna a resposta gerada pelo agente financeiro.
+   * e retorna a resposta gerada pelo agente financeiro com suporte a botões interativos.
    */
-  async processFinancialMessage(payload: ProcessFinancialMessagePayload): Promise<string> {
+  async processFinancialMessage(payload: ProcessFinancialMessagePayload): Promise<ProcessFinancialMessageResponse> {
     try {
       console.log(`[FinancialIntegrationService] Encaminhando mensagem de ${payload.phoneNumber} para ${this.baseUrl}/api/finance/process-message...`);
 
@@ -40,14 +46,23 @@ export class FinancialIntegrationService {
       );
 
       const responseText = response.data?.data?.responseText;
+      const buttons = response.data?.data?.buttons;
+      const intent = response.data?.data?.intent;
+
       if (!responseText) {
         throw new Error("Serviço de Gestão Financeira não retornou um 'responseText' válido.");
       }
 
-      return responseText;
+      return {
+        responseText,
+        buttons,
+        intent,
+      };
     } catch (error: any) {
       console.error("[FinancialIntegrationService] Erro ao comunicar com o serviço de Gestão Financeira:", error.response?.data || error.message);
-      return "⚠️ Não foi possível se conectar ao serviço de Gestão Financeira no momento. Por favor, tente novamente em instantes.";
+      return {
+        responseText: "⚠️ Não foi possível se conectar ao serviço de Gestão Financeira no momento. Por favor, tente novamente em instantes.",
+      };
     }
   }
 }

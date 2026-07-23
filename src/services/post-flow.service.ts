@@ -319,7 +319,7 @@ export class PostFlowService {
       }
 
       // Encaminha a mensagem para o serviço backend de Gestão Financeira
-      const financialResponse = await this.financialIntegrationService.processFinancialMessage({
+      const financialResult = await this.financialIntegrationService.processFinancialMessage({
         phoneNumber: senderPhone,
         userName: incomingMsg.senderName,
         messageType: isAudio ? "audio" : isImage ? "image" : (incomingMsg.type as any),
@@ -328,7 +328,11 @@ export class PostFlowService {
         imageBase64,
       });
 
-      await this.whatsappService.sendText(senderPhone, financialResponse, cwCtx);
+      if (financialResult.buttons && financialResult.buttons.length > 0) {
+        await this.whatsappService.sendButtons(senderPhone, financialResult.responseText, financialResult.buttons, cwCtx);
+      } else {
+        await this.whatsappService.sendText(senderPhone, financialResult.responseText, cwCtx);
+      }
       return true;
     }
 
