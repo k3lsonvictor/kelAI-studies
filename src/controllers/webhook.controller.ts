@@ -131,13 +131,26 @@ export class WebhookController {
 
           if (attachments && attachments.length > 0) {
             const attachment = attachments[0];
-            const isImgType = attachment.file_type === "image" || attachment.file_type === "image/png" || attachment.file_type === "image/jpeg" || attachment.file_type === "file";
-            const isImgUrl = Boolean(attachment.data_url?.match(/\.(jpg|jpeg|png|webp)/i)) || Boolean(attachment.thumb_url);
+            const fileType = (attachment.file_type || "").toLowerCase();
+            const dataUrl = (attachment.data_url || attachment.thumb_url || "").toLowerCase();
+
+            const isImgType = fileType.includes("image");
+            const isImgUrl = Boolean(dataUrl.match(/\.(jpg|jpeg|png|webp)/i)) || Boolean(attachment.thumb_url);
+
+            const isAudioType = fileType.includes("audio") || fileType.includes("voice");
+            const isAudioUrl = Boolean(dataUrl.match(/\.(ogg|oga|opus|mp3|m4a|wav|aac)/i));
 
             if (isImgType || isImgUrl) {
               msgType = "image";
               mediaUrl = attachment.data_url || attachment.thumb_url;
               caption = userMessage && userMessage !== "[Imagem]" ? userMessage : "";
+            } else if (isAudioType || isAudioUrl) {
+              msgType = "audio";
+              mediaUrl = attachment.data_url;
+              caption = userMessage && userMessage !== "[Áudio]" ? userMessage : "";
+            } else if (fileType.includes("document") || fileType.includes("pdf") || Boolean(dataUrl.match(/\.(pdf|doc|docx)/i))) {
+              msgType = "document";
+              mediaUrl = attachment.data_url;
             }
           }
 
@@ -184,7 +197,7 @@ export class WebhookController {
             messageId: uniqueMessageId,
             timestamp: new Date(),
             type: msgType,
-            body: userMessage || (msgType === "image" ? "[Imagem]" : ""),
+            body: userMessage || (msgType === "image" ? "[Imagem]" : msgType === "audio" ? "[Áudio]" : ""),
             phoneNumberId: env.phoneNumberId,
             chatwootAccountId: accountId,
             chatwootConversationId: conversationId,
