@@ -441,16 +441,33 @@ export class PostFlowService {
         }
 
         let rawCaption = (incomingMsg.caption || incomingMsg.body || "").trim();
-        let extractedData: { title: string; price: string; extraContext?: string };
+        const hasCaption = rawCaption.length > 0 && rawCaption !== "[Imagem]";
 
-        if (rawCaption.length > 0 && rawCaption !== "[Imagem]") {
-          if (this.aiService) {
-            extractedData = await this.aiService.extractTitleAndPrice(rawCaption);
-          } else {
-            extractedData = parseTitleAndPriceRegex(rawCaption);
-          }
+        if (!hasCaption) {
+          // O usuário enviou APENAS a foto sem legenda/texto!
+          // Salvamos a foto na sessão e pedimos o Nome do Produto antes de gerar a arte.
+          session = await this.updateSession(contactId, cwCtx, {
+            step: PostStep.INPUT_IMAGE,
+            postType: "produto",
+            templateId: "quick",
+            productTitle: null,
+            productPrice: null,
+            productImage: base64Image,
+          });
+
+          let requestTextMsg = "📸 *Foto do Produto Recebida!* 🎨\n\n";
+          requestTextMsg += "Por favor, digite o **Nome do Produto** (e o **Preço**, se desejar exibi-lo na arte).\n\n";
+          requestTextMsg += "💡 *Dica:* Para criar um *Post de Desejo* (sem preço), digite apenas o Nome do Produto!";
+
+          await this.whatsappService.sendText(senderPhone, requestTextMsg, cwCtx);
+          return true;
+        }
+
+        let extractedData: { title: string; price: string; extraContext?: string };
+        if (this.aiService) {
+          extractedData = await this.aiService.extractTitleAndPrice(rawCaption);
         } else {
-          extractedData = { title: "Produto Especial", price: "Consulte" };
+          extractedData = parseTitleAndPriceRegex(rawCaption);
         }
 
         const title = extractedData.title;
