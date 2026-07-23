@@ -119,15 +119,13 @@ function buildExactGeradorPostsPrompt(
 
   let humanModelPrompt = "";
   if (hasHumanModel) {
-    const genderStr = humanModelGender === "man" ? "masculino (homem adulto)" : humanModelGender === "kids" ? "infantil (criança / modelo infantil)" : "feminino (mulher adulta)";
+    const genderStr = humanModelGender === "man" ? "masculino (homem adulto real)" : humanModelGender === "kids" ? "infantil (criança / modelo infantil real)" : "feminino (mulher adulta real)";
     humanModelPrompt = `
-• EXIGÊNCIA OBRIGATÓRIA DE MODELO: A imagem gerada DEVE OBRIGATORIAMENTE conter um modelo humano ${genderStr} VESTINDO e apresentando a peça de roupa / produto principal na composição.
+• EXIGÊNCIA OBRIGATÓRIA DE MODELO HUMANO REAL: A imagem gerada DEVE OBRIGATORIAMENTE conter um(a) modelo humano(a) real ${genderStr} VESTINDO e apresentando a peça de roupa principal na composição.
 
-• Se a imagem de entrada mostrar a roupa em um manequim, cabide, mesa ou produto isolado, VOCÊ DEVE SUBSTITTUIR essa apresentação e colocar a peça de roupa VESTIDA por um(a) modelo humano(a) real ${genderStr}. Preserve fielmente o design da roupa, incluindo cores, estampas, tecidos, modelagem e todos os detalhes originais. NUNCA gere a imagem final com o produto isolado ou em manequim quando esta regra estiver ativa.
+• REGRA CRÍTICA DE SUBSTITUIÇÃO DE MANEQUIM POR MODELO REAL: Se a imagem de entrada mostrar a peça de roupa vestida em um MANEQUIM (manequim de plástico, busto de loja, manequim sem rosto, gesso, cabide ou expositor), VOCÊ DEVE OBRIGATORIAMENTE REMOVER E SUBSTITUIR O MANEQUIM! Transfira e adapte a peça de roupa para ser VESTIDA POR UM(A) MODELO HUMANO(A) REAL ${genderStr} (com pele humana realista, feições faciais reais, cabelos naturais e pose de ensaio fotográfico de catálogo). NUNCA mantenha o manequim de plástico ou boneco de loja na imagem gerada.
 
-• O(A) modelo deve estar vestindo a peça de forma natural, realista e elegante, como em um ensaio fotográfico profissional para catálogo de moda ou redes sociais.
-
-• Garanta que o produto principal continue em destaque absoluto e não seja modificado, ocultado ou obstruído.
+• O(A) modelo deve estar vestindo a peça de forma natural, realista e elegante, como em um ensaio fotográfico profissional para catálogo de moda. Preserve fielmente o design da roupa, incluindo cores, estampas, tecidos, modelagem e detalhes originais.
 `;
   } else {
     humanModelPrompt = "Não adicione nenhum modelo humano (pessoas, homens ou mulheres) na imagem. O foco visual deve ser puramente no produto.";
