@@ -293,13 +293,68 @@ export class PostFlowService {
       return true;
     }
 
-    // --- GATILHO INICIAL: "novo post" ➔ Só pergunta o Nicho se NÃO estiver salvo ---
-    if (!session || isTrigger) {
-      if (!session && !isTrigger) {
+    const isHasPhoto = incomingMsg.type === "image" || Boolean(incomingMsg.mediaId) || Boolean(incomingMsg.mediaUrl);
+
+    // --- GATILHO INICIAL: "novo post" ou Envio Direto de Foto ---
+    if (!session || isTrigger || isHasPhoto) {
+      if (!session && !isTrigger && !isHasPhoto) {
         return false;
       }
 
       const hasSavedNicho = session && session.businessType;
+
+      if (isHasPhoto) {
+        let base64Image: string | null = null;
+        try {
+          if (incomingMsg.mediaUrl) {
+            console.log(`[PostFlowService] Baixando foto de anexo em gatilho rápido (${incomingMsg.mediaUrl})...`);
+            base64Image = await downloadImageFromUrlAsBase64(incomingMsg.mediaUrl);
+          } else if (incomingMsg.mediaId) {
+            console.log(`[PostFlowService] Baixando foto de Meta API em gatilho rápido (mediaId: ${incomingMsg.mediaId})...`);
+            base64Image = await this.whatsappService.downloadMedia(incomingMsg.mediaId);
+          }
+        } catch (err: any) {
+          console.error(`[PostFlowService] Erro ao baixar foto enviada no gatilho:`, err.message || err);
+        }
+
+        if (hasSavedNicho) {
+          // Nicho já está salvo: Ativa o Modo Post Rápido DIRETO e gera a arte instantaneamente!
+          session = await this.updateSession(contactId, cwCtx, {
+            step: PostStep.INPUT_IMAGE,
+            postType: "produto",
+            templateId: "quick",
+            colors: null,
+            productTitle: null,
+            productPrice: null,
+            productImage: base64Image,
+          });
+
+          // Processa a foto e a legenda enviadas imediatamente
+          return this.handlePostFlow(contactId, incomingMsg, userProfile);
+        } else {
+          // Primeira vez com foto: salva a foto na sessão e pede o Nicho
+          session = await this.updateSession(contactId, cwCtx, {
+            step: PostStep.SELECT_BUSINESS_TYPE,
+            businessType: null,
+            hasHumanModel: null,
+            modelProfile: null,
+            postType: "produto",
+            templateId: "quick",
+            colors: null,
+            productTitle: null,
+            productPrice: null,
+            productImage: base64Image,
+            ...(incomingMsg.body && incomingMsg.body.trim() && { extraContext: incomingMsg.body.trim() }),
+          });
+
+          await this.sendBusinessTypePrompt(
+            senderPhone,
+            "Olá! 🚀 Bem-vindo ao Gerador de Posts Promto!\n\nQual é o segmento/nicho do seu negócio?",
+            cwCtx
+          );
+          return true;
+        }
+      }
 
       if (hasSavedNicho) {
         // Nicho já está salvo, pula direto para a escolha do Modo (Rápido vs Personalizado)
@@ -362,6 +417,17 @@ export class PostFlowService {
         selectedBusinessType = "promocao";
       } else if (isOption4) {
         selectedBusinessType = "geral";
+      }
+
+      // Se a foto já foi enviada na primeira mensagem (armazenada em session.productImage):
+      if (session.productImage) {
+        session = await this.updateSession(contactId, cwCtx, {
+          step: PostStep.INPUT_IMAGE,
+          businessType: selectedBusinessType,
+        });
+
+        // Simula a mensagem da foto com a legenda enviada anteriormente para gerar a arte imediatamente
+        return this.handlePostFlow(contactId, incomingMsg, userProfile);
       }
 
       session = await this.updateSession(contactId, cwCtx, {
