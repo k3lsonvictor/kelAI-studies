@@ -259,6 +259,28 @@ export class PostFlowService {
     const hasSession = Boolean(session);
     const isTrigger = this.isTriggerMessage(cleanText, hasSession);
 
+    // --- 0. INTERCEPTAÇÃO DE SAUDAÇÃO E APRESENTACÃO DE OPÇÕES ---
+    const greetingWords = ["olá", "ola", "oi", "boa tarde", "bom dia", "boa noite", "menu", "ajuda", "inicio", "início", "opções", "opcoes", "como funciona"];
+    const isGreeting = greetingWords.some((g) => cleanLower === g || cleanLower.startsWith(g + " ") || cleanLower.startsWith(g + "!") || cleanLower.startsWith(g + ","));
+
+    if (isGreeting && (!session || session.step === PostStep.SELECT_FLOW_MODE)) {
+      const nameStr = incomingMsg.senderName ? `, ${incomingMsg.senderName}` : "";
+      const greetingMsg =
+        `Olá${nameStr}! 🚀 Bem-vindo à plataforma **Promto / kel-IA**!\n\n` +
+        `Como posso ajudar o seu negócio hoje?\n\n` +
+        `🎨 *Criar Post / Arte*: Digite **'novo post'** (ou envie a foto do produto com o Nome e Preço na legenda).\n\n` +
+        `💰 *Gestão Financeira*: Digite **'gestão financeira'** para registrar receitas, gastos, fiados ou consultar o caixa.\n\n` +
+        `Escolha uma das opções abaixo para começar:`;
+
+      const buttons = [
+        { id: "novo_post", title: "🎨 Criar Novo Post" },
+        { id: "gestao_financeira", title: "💰 Gestão Financeira" },
+      ];
+
+      await this.whatsappService.sendButtons(senderPhone, greetingMsg, buttons, cwCtx);
+      return true;
+    }
+
     // --- 1. COMANDO PARA ENTRAR NO MODO GESTÃO FINANCEIRA ---
     if (this.isFinancialCommand(cleanText)) {
       await this.updateSession(contactId, cwCtx, {
