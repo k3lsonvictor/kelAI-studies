@@ -123,8 +123,7 @@ ORDEM DE PRIORIDADE MÁXIMA DE EDIÇÃO: RE-IMAGINAR ROUPA EM MODELO HUMANA IA R
     ? "POST DE DESEJO (SEM PREÇO NUMÉRICO): NUNCA exiba nenhum valor numérico de preço (como R$ 0,00) nem badge/card de preço na imagem. Em vez do preço numérico, inclua uma chamada de desejo discreta, magnética e elegante como 'Peça o Seu', 'Edição Limitada', 'Consulte Disponibilidade' ou 'Peça pelo WhatsApp', ou mantenha o foco puramente no produto e no desejo visual."
     : price;
 
-  prompt = prompt.replace("{{price}}", priceText);
-  prompt = prompt.replace("{{cta}}", "Não fornecido (NÃO inclua nenhum botão de CTA)");
+  prompt = prompt.replace(/\{\{cta\}\}/g, "Não fornecido (NÃO inclua nenhum botão de CTA, pílula ou caixa de ação)");
 
   const primaryColor = (colors && colors.trim())
     ? `Use preferencialmente estas cores especificadas pelo usuário: ${colors.trim()}`
