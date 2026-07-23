@@ -3,11 +3,11 @@ import { env } from "../config/env.js";
 
 export interface ProcessFinancialMessagePayload {
   phoneNumber: string;
-  userName?: string;
-  messageType?: "text" | "audio" | "image";
-  textBody?: string;
-  audioBase64?: string;
-  imageBase64?: string;
+  userName?: string | undefined;
+  messageType?: "text" | "audio" | "image" | undefined;
+  textBody?: string | undefined;
+  audioBase64?: string | undefined;
+  imageBase64?: string | undefined;
 }
 
 export class FinancialIntegrationService {

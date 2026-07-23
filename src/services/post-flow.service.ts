@@ -295,12 +295,37 @@ export class PostFlowService {
         return true;
       }
 
+      let audioBase64: string | undefined = undefined;
+      let imageBase64: string | undefined = undefined;
+
+      const isAudio = incomingMsg.type === "audio" || (incomingMsg.body && incomingMsg.body.includes("[Áudio]"));
+      const isImage = incomingMsg.type === "image" || (incomingMsg.body && incomingMsg.body.includes("[Imagem]"));
+
+      if ((isAudio || isImage) && (incomingMsg.mediaId || incomingMsg.mediaUrl)) {
+        try {
+          console.log(`[PostFlowService] Baixando mídia (${incomingMsg.type}) para a Gestão Financeira...`);
+          if (incomingMsg.mediaUrl) {
+            const downloaded = await downloadImageFromUrlAsBase64(incomingMsg.mediaUrl);
+            if (isAudio) audioBase64 = downloaded;
+            else imageBase64 = downloaded;
+          } else if (incomingMsg.mediaId) {
+            const downloaded = await this.whatsappService.downloadMedia(incomingMsg.mediaId);
+            if (isAudio) audioBase64 = downloaded;
+            else imageBase64 = downloaded;
+          }
+        } catch (err: any) {
+          console.error(`[PostFlowService] Erro ao baixar mídia no modo financeiro:`, err.message || err);
+        }
+      }
+
       // Encaminha a mensagem para o serviço backend de Gestão Financeira
       const financialResponse = await this.financialIntegrationService.processFinancialMessage({
         phoneNumber: senderPhone,
         userName: incomingMsg.senderName,
-        messageType: incomingMsg.type as any,
-        textBody: incomingMsg.body,
+        messageType: isAudio ? "audio" : isImage ? "image" : (incomingMsg.type as any),
+        textBody: (incomingMsg.body === "[Áudio]" || incomingMsg.body === "[Imagem]") ? "" : incomingMsg.body,
+        audioBase64,
+        imageBase64,
       });
 
       await this.whatsappService.sendText(senderPhone, financialResponse, cwCtx);
